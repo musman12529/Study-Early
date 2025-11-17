@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:studyearly/models/course.dart';
 
 class CourseService {
@@ -35,26 +34,6 @@ class CourseService {
       vectorStoreId: vectorStoreId,
     );
     await _userCourses(creatorId).doc(course.id).set(course.toMap());
-
-    try {
-      final callable = FirebaseFunctions.instance.httpsCallable(
-        'createVectorStore',
-      );
-      final resp = await callable.call(<String, dynamic>{
-        'userId': creatorId,
-        'courseId': course.id,
-        'courseName': title,
-      });
-      final data = resp.data;
-      if (data is Map && data['vectorStoreId'] is String) {
-        await _userCourses(creatorId).doc(course.id).update({
-          'vectorStoreId': data['vectorStoreId'] as String,
-          'updatedAt': Timestamp.fromDate(DateTime.now()),
-        });
-      }
-    } catch (_) {
-      // handle errors with creating vector store
-    }
     return course;
   }
 

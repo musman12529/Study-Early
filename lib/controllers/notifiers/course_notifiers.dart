@@ -35,6 +35,6 @@ class CourseListNotifier extends FamilyNotifier<List<Course>, String> {
   }
 
   Future<void> remove(String courseId) async {
-    await _service.deleteCourse(courseId);
+    await _service.deleteCourse(creatorId: arg, courseId: courseId);
   }
 }

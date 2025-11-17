@@ -2,24 +2,24 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:studyearly/models/course.dart';
 
 class CourseService {
-  CourseService(FirebaseFirestore firestore)
-    : _collection = firestore.collection('courses');
+  CourseService(FirebaseFirestore firestore) : _firestore = firestore;
 
-  final CollectionReference<Map<String, dynamic>> _collection;
+  final FirebaseFirestore _firestore;
+  CollectionReference<Map<String, dynamic>> _userCourses(String userId) {
+    return _firestore.collection('users').doc(userId).collection('courses');
+  }
 
   Stream<List<Course>> watchCoursesForCreator(String creatorId) {
-    return _collection
-        .where('creatorId', isEqualTo: creatorId)
+    return _userCourses(creatorId)
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snap) => snap.docs.map(Course.fromMap).toList());
   }
 
   Future<List<Course>> fetchCoursesForCreator(String creatorId) async {
-    final snap = await _collection
-        .where('creatorId', isEqualTo: creatorId)
-        .orderBy('createdAt', descending: true)
-        .get();
+    final snap = await _userCourses(
+      creatorId,
+    ).orderBy('createdAt', descending: true).get();
     return snap.docs.map(Course.fromMap).toList();
   }
 
@@ -33,18 +33,21 @@ class CourseService {
       title: title,
       vectorStoreId: vectorStoreId,
     );
-    await _collection.doc(course.id).set(course.toMap());
+    await _userCourses(creatorId).doc(course.id).set(course.toMap());
     return course;
   }
 
   Future<void> updateCourse(Course course) async {
-    await _collection.doc(course.id).update({
+    await _userCourses(course.creatorId).doc(course.id).update({
       ...course.toMap(),
       'updatedAt': Timestamp.fromDate(DateTime.now()),
     });
   }
 
-  Future<void> deleteCourse(String courseId) async {
-    await _collection.doc(courseId).delete();
+  Future<void> deleteCourse({
+    required String creatorId,
+    required String courseId,
+  }) async {
+    await _userCourses(creatorId).doc(courseId).delete();
   }
 }

@@ -38,8 +38,3 @@ class CourseListNotifier extends FamilyNotifier<List<Course>, String> {
     await _service.deleteCourse(courseId);
   }
 }
-
-final courseListProvider =
-    NotifierProvider.family<CourseListNotifier, List<Course>, String>(
-      CourseListNotifier.new,
-    );

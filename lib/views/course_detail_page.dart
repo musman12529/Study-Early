@@ -42,22 +42,46 @@ class CourseDetailPage extends ConsumerWidget {
                       child: ListTile(
                         leading: const Icon(Icons.picture_as_pdf),
                         title: Text(m.fileName),
-                        subtitle: Text(
-                          'Status: ${m.status.asString}'
-                          '${m.openAiFileId != null ? ' • OpenAI: ${m.openAiFileId}' : ''}',
-                        ),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.delete_outline),
-                          onPressed: () async {
-                            await ref
-                                .read(
-                                  courseMaterialListProvider((
-                                    user.uid,
-                                    courseId,
-                                  )).notifier,
-                                )
-                                .remove(m.id);
-                          },
+                        subtitle: Text('Status: ${m.status.asString}'),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (m.status == MaterialStatus.error)
+                              IconButton(
+                                tooltip: 'Retry indexing',
+                                icon: const Icon(Icons.refresh),
+                                onPressed: () async {
+                                  // Optional: quick feedback
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Retrying indexing...'),
+                                      duration: Duration(seconds: 1),
+                                    ),
+                                  );
+                                  await ref
+                                      .read(
+                                        courseMaterialListProvider((
+                                          user.uid,
+                                          courseId,
+                                        )).notifier,
+                                      )
+                                      .retry(m);
+                                },
+                              ),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline),
+                              onPressed: () async {
+                                await ref
+                                    .read(
+                                      courseMaterialListProvider((
+                                        user.uid,
+                                        courseId,
+                                      )).notifier,
+                                    )
+                                    .remove(m.id);
+                              },
+                            ),
+                          ],
                         ),
                       ),
                     );

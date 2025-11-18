@@ -1,4 +1,4 @@
-import { onCall } from "firebase-functions/v2/https";
+import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
 import * as admin from "firebase-admin";
 import OpenAI from "openai";
@@ -14,21 +14,23 @@ export const indexMaterial = onCall(
   {
     region: "northamerica-northeast2",
     secrets: [OPENAI_KEY],
-    timeoutSeconds: 300, // indexing PDFs may take time
+    timeoutSeconds: 300,
   },
   async (req) => {
     const { userId, courseId, courseName, materialId, storagePath } = req.data;
 
+    // Validate fields
     if (!userId || !courseId || !materialId || !storagePath) {
-      throw new Error(
+      throw new HttpsError(
+        "invalid-argument",
         "Missing required fields: userId, courseId, materialId, storagePath."
       );
     }
 
     const openai = new OpenAI({ apiKey: OPENAI_KEY.value() });
 
-    const courseRef = admin
-      .firestore()
+    const db = admin.firestore();
+    const courseRef = db
       .collection("users")
       .doc(userId)
       .collection("courses")
@@ -36,68 +38,114 @@ export const indexMaterial = onCall(
 
     const materialRef = courseRef.collection("materials").doc(materialId);
 
-    // 1️⃣ Get course data
-    const courseSnap = await courseRef.get();
-    const course = courseSnap.data();
-
-    let vectorStoreId = course?.vectorStoreId ?? null;
-
-    // 2️⃣ Create vector store if missing
-    if (!vectorStoreId) {
-      console.log("No vector store found. Creating a new one...");
-
-      const store = await openai.vectorStores.create({
-        name: `${courseName}_vector_store`,
-      });
-
-      vectorStoreId = store.id;
-
-      // update course with vectorStoreId
-      await courseRef.update({
-        vectorStoreId,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-    }
-
-    // 3️⃣ Download PDF from Firebase Storage to temp file
-    const tempLocalFile = path.join(os.tmpdir(), `${materialId}.pdf`);
-    await admin.storage().bucket().file(storagePath).download({
-      destination: tempLocalFile,
-    });
-
-    console.log("Downloaded file to", tempLocalFile);
-
-    // 4️⃣ Upload file to OpenAI Files API
-    const fileUpload = await openai.files.create({
-      file: fs.createReadStream(tempLocalFile),
-      purpose: "assistants",
-    });
-
-    const fileId = fileUpload.id;
-
-    console.log("Uploaded file to OpenAI. File ID:", fileId);
-
-    // 5️⃣ Add file to vector store
-    await openai.vectorStores.files.create(vectorStoreId, {
-      file_id: fileId,
-    });
-
-    console.log("Added file to vector store:", vectorStoreId);
-
-    // 6️⃣ Update material doc
+    // Mark the material as indexing (UI feedback)
     await materialRef.update({
-      openAiFileId: fileId,
-      status: "indexed",
+      status: "indexing",
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    // Cleanup temp file
-    fs.unlinkSync(tempLocalFile);
+    const tempLocalFile = path.join(os.tmpdir(), `${materialId}.pdf`);
 
-    return {
-      vectorStoreId,
-      fileId,
-      message: "Material successfully indexed.",
-    };
+    try {
+      console.log("========== INDEX MATERIAL START ==========");
+      console.log("[Input]", req.data);
+
+      // Load course
+      console.log("[Firestore] Fetching course document...");
+      const courseSnap = await courseRef.get();
+      const course = courseSnap.data();
+      let vectorStoreId = course?.vectorStoreId ?? null;
+
+      // 1️⃣ If no vector store exists → create one
+      if (!vectorStoreId) {
+        console.log("[OpenAI] No vector store found. Creating...");
+
+        const store = await openai.vectorStores.create({
+          name: `${courseName ?? "course"}_vector_store`,
+        });
+
+        vectorStoreId = store.id;
+
+        console.log("[OpenAI] Vector store created:", vectorStoreId);
+
+        await courseRef.update({
+          vectorStoreId,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
+
+      // 2️⃣ Download PDF from Storage → temp file
+      console.log("[Firebase Storage] Downloading file:", storagePath);
+      await admin.storage().bucket().file(storagePath).download({
+        destination: tempLocalFile,
+      });
+      console.log("[Temp] File downloaded to:", tempLocalFile);
+
+      // 3️⃣ Upload file to OpenAI Files API
+      console.log("[OpenAI] Uploading file to Files API...");
+      const fileUpload = await openai.files.create({
+        file: fs.createReadStream(tempLocalFile),
+        purpose: "assistants",
+      });
+
+      const fileId = fileUpload.id;
+      console.log("[OpenAI] File uploaded. File ID:", fileId);
+
+      // 4️⃣ Add file to vector store
+      console.log("[OpenAI] Adding file to Vector Store:", vectorStoreId);
+      await openai.vectorStores.files.create(vectorStoreId, {
+        file_id: fileId,
+      });
+
+      console.log("[OpenAI] File added to Vector Store successfully!");
+
+      // 5️⃣ Update material document
+      console.log("[Firestore] Updating material...");
+      await materialRef.update({
+        openAiFileId: fileId,
+        status: "indexed",
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      console.log("========== INDEX MATERIAL COMPLETE ==========");
+
+      return {
+        vectorStoreId,
+        fileId,
+        message: "Material successfully indexed.",
+      };
+    } catch (error: any) {
+      console.error("========== INDEX MATERIAL ERROR ==========");
+      console.error("[Error Message]:", error.message);
+      console.error("[Error Raw]:", error);
+
+      // If OpenAI returned a request ID, log it (GOLD for debugging)
+      const requestId =
+        error?.response?.headers?.["x-request-id"] ??
+        error?.response?.headers?.get?.("x-request-id");
+      if (requestId) console.error("[OpenAI Request ID]:", requestId);
+
+      // Update Firestore status
+      await materialRef.update({
+        status: "error",
+        lastError: error?.message ?? "Unknown indexing error",
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      throw new HttpsError(
+        "internal",
+        `Indexing failed: ${error.message ?? "Unknown error"}`
+      );
+    } finally {
+      // Cleanup temp file
+      if (fs.existsSync(tempLocalFile)) {
+        try {
+          fs.unlinkSync(tempLocalFile);
+          console.log("[Temp] Cleaned up temp file.");
+        } catch (cleanupErr) {
+          console.error("[Temp] Failed to remove temp file:", cleanupErr);
+        }
+      }
+    }
   }
 );

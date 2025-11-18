@@ -117,4 +117,28 @@ class CourseMaterialService {
       'storagePath': storagePath,
     });
   }
+
+  Future<void> retryIndex({
+    required String creatorId,
+    required CourseMaterial material,
+  }) async {
+    final storagePath = material.storagePath;
+    if (storagePath == null || storagePath.isEmpty) {
+      throw StateError('Missing storagePath for material ${material.id}');
+    }
+
+    await _materialsRef(creatorId, material.courseId).doc(material.id).update({
+      'status': MaterialStatus.indexing.asString,
+      'updatedAt': Timestamp.fromDate(DateTime.now()),
+    });
+
+    await FirebaseFunctions.instanceFor(
+      region: 'northamerica-northeast2',
+    ).httpsCallable('indexMaterial').call({
+      'userId': creatorId,
+      'courseId': material.courseId,
+      'materialId': material.id,
+      'storagePath': storagePath,
+    });
+  }
 }

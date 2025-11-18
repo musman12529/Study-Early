@@ -63,4 +63,9 @@ class CourseMaterialListNotifier
       materialId: materialId,
     );
   }
+
+  Future<void> retry(CourseMaterial material) async {
+    final creatorId = arg.$1;
+    await _service.retryIndex(creatorId: creatorId, material: material);
+  }
 }

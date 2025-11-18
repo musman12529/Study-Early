@@ -1,4 +1,8 @@
+import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 import '../../models/course_material.dart';
 
@@ -29,23 +33,12 @@ class CourseMaterialService {
         .map((snap) => snap.docs.map(CourseMaterial.fromMap).toList());
   }
 
-  Future<List<CourseMaterial>> fetchMaterials({
-    required String creatorId,
-    required String courseId,
-  }) async {
-    final snap = await _materialsRef(
-      creatorId,
-      courseId,
-    ).orderBy('createdAt', descending: true).get();
-    return snap.docs.map(CourseMaterial.fromMap).toList();
-  }
-
   Future<CourseMaterial> createMaterial({
     required String creatorId,
     required String courseId,
     required String fileName,
     required String downloadUrl,
-    String? storagePath,
+    required String storagePath,
     String? uploadedByUserId,
   }) async {
     final material = CourseMaterial(
@@ -85,5 +78,43 @@ class CourseMaterialService {
     required String materialId,
   }) async {
     await _materialsRef(creatorId, courseId).doc(materialId).delete();
+  }
+
+  Future<void> uploadAndIndex({
+    required String creatorId,
+    required String courseId,
+    required String fileName,
+    required String filePath,
+  }) async {
+    final sanitized = fileName.replaceAll(RegExp(r'[^a-zA-Z0-9_.-]'), '_');
+    final storagePath =
+        'users/$creatorId/courses/$courseId/materials/${DateTime.now().millisecondsSinceEpoch}-$sanitized';
+
+    final storageRef = FirebaseStorage.instance.ref(storagePath);
+
+    await storageRef.putFile(
+      File(filePath),
+      SettableMetadata(contentType: 'application/pdf'),
+    );
+
+    final downloadUrl = await storageRef.getDownloadURL();
+
+    final material = await createMaterial(
+      creatorId: creatorId,
+      courseId: courseId,
+      fileName: fileName,
+      downloadUrl: downloadUrl,
+      storagePath: storagePath,
+      uploadedByUserId: creatorId,
+    );
+
+    await FirebaseFunctions.instanceFor(
+      region: 'northamerica-northeast2',
+    ).httpsCallable('indexMaterial').call({
+      'userId': creatorId,
+      'courseId': courseId,
+      'materialId': material.id,
+      'storagePath': storagePath,
+    });
   }
 }

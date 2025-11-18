@@ -33,22 +33,18 @@ class CourseMaterialListNotifier
     return state;
   }
 
-  Future<void> add({
+  Future<void> uploadAndIndex({
     required String fileName,
-    required String downloadUrl,
-    String? storagePath,
-    String? uploadedByUserId,
+    required String filePath,
   }) async {
     final creatorId = arg.$1;
     final courseId = arg.$2;
 
-    await _service.createMaterial(
+    await _service.uploadAndIndex(
       creatorId: creatorId,
       courseId: courseId,
       fileName: fileName,
-      downloadUrl: downloadUrl,
-      storagePath: storagePath,
-      uploadedByUserId: uploadedByUserId,
+      filePath: filePath,
     );
   }
 

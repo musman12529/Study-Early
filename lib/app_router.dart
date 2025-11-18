@@ -5,6 +5,7 @@ import '../views/home_page.dart';
 import '../views/auth/login_screen.dart';
 import '../views/auth/error_screen.dart';
 import 'controllers/providers/auth_providers.dart';
+import 'views/course_detail_page.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authStateChangesProvider);
@@ -38,6 +39,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'login',
         path: '/login',
         builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        name: 'courseDetail',
+        path: '/course/:courseId',
+        builder: (context, state) {
+          final courseId = state.pathParameters['courseId']!;
+          return CourseDetailPage(courseId: courseId);
+        },
       ),
     ],
 

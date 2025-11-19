@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:studyearly/models/course.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 
 class CourseService {
   CourseService(FirebaseFirestore firestore) : _firestore = firestore;
@@ -49,6 +50,8 @@ class CourseService {
     required String creatorId,
     required String courseId,
   }) async {
-    await _userCourses(creatorId).doc(courseId).delete();
+    await FirebaseFunctions.instanceFor(region: 'northamerica-northeast2')
+        .httpsCallable('deleteCourse')
+        .call({'userId': creatorId, 'courseId': courseId});
   }
 }

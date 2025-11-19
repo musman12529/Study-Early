@@ -46,9 +46,55 @@ class HomePage extends ConsumerWidget {
                   trailing: IconButton(
                     icon: const Icon(Icons.delete_outline),
                     onPressed: () async {
-                      await ref
-                          .read(courseListProvider(user.uid).notifier)
-                          .remove(course.id);
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (context) {
+                          return AlertDialog(
+                            title: const Text("Delete Course?"),
+                            content: const Text(
+                              "This will permanently delete all materials, OpenAI vector store data, and "
+                              "PDF files for this course. This action cannot be undone.",
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context, false),
+                                child: const Text("Cancel"),
+                              ),
+                              TextButton(
+                                onPressed: () => Navigator.pop(context, true),
+                                child: const Text(
+                                  "Delete",
+                                  style: TextStyle(color: Colors.red),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      );
+
+                      if (confirm != true) return;
+
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("Deleting course…")),
+                      );
+
+                      try {
+                        await ref
+                            .read(courseListProvider(user.uid).notifier)
+                            .remove(course.id);
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text("Course deleted successfully."),
+                          ),
+                        );
+                      } catch (e) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text("Failed to delete course: $e"),
+                          ),
+                        );
+                      }
                     },
                   ),
                   onTap: () {

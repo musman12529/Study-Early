@@ -283,3 +283,156 @@ export const deleteMaterial = onCall(
     }
   }
 );
+
+export const deleteCourse = onCall(
+  {
+    region: "northamerica-northeast2",
+    secrets: [OPENAI_KEY],
+    timeoutSeconds: 300, // deleting materials may take time
+  },
+  async (req) => {
+    const { userId, courseId } = req.data;
+
+    if (!userId || !courseId) {
+      throw new HttpsError("invalid-argument", "Missing userId or courseId.");
+    }
+
+    const db = admin.firestore();
+    const openai = new OpenAI({ apiKey: OPENAI_KEY.value() });
+
+    const courseRef = db
+      .collection("users")
+      .doc(userId)
+      .collection("courses")
+      .doc(courseId);
+
+    console.log("========== DELETE COURSE START ==========");
+    console.log("[Input]", req.data);
+
+    // 1️⃣ Load course
+    const courseSnap = await courseRef.get();
+    if (!courseSnap.exists) {
+      console.log("[Firestore] Course already deleted.");
+      return { message: "Course already deleted." };
+    }
+
+    const courseData = courseSnap.data() as {
+      vectorStoreId?: string;
+      name?: string;
+    };
+
+    const vectorStoreId = courseData.vectorStoreId;
+
+    console.log("[Course] vectorStoreId:", vectorStoreId);
+
+    try {
+      // 2️⃣ Load all materials
+      console.log("[Firestore] Loading course materials...");
+      const materialsSnap = await courseRef.collection("materials").get();
+      const materials = materialsSnap.docs;
+
+      console.log(`[Firestore] Found ${materials.length} materials.`);
+
+      // 3️⃣ Loop and delete each material exactly like deleteMaterial
+      for (const doc of materials) {
+        const materialId = doc.id;
+        const material = doc.data() as {
+          storagePath?: string;
+          openAiFileId?: string;
+          status?: string;
+        };
+
+        const { storagePath, openAiFileId, status } = material;
+
+        console.log("----- Deleting Material:", materialId);
+        console.log("[Material] status:", status);
+
+        // Prevent course deletion while indexing
+        if (status === "indexing" || status === "pending") {
+          throw new HttpsError(
+            "failed-precondition",
+            `Material ${materialId} is still indexing. Cannot delete course.`
+          );
+        }
+
+        // 3.1 Delete vector store reference
+        if (vectorStoreId && openAiFileId) {
+          try {
+            console.log("[OpenAI] Removing file from vector store...");
+            await openai.vectorStores.files.delete(openAiFileId, {
+              vector_store_id: vectorStoreId,
+            });
+            console.log("[OpenAI] Removed file from vector store.");
+          } catch (err) {
+            console.error(
+              "[OpenAI] Failed removing file from vector store.",
+              err
+            );
+          }
+        }
+
+        // 3.2 Delete OpenAI file
+        if (openAiFileId) {
+          try {
+            console.log("[OpenAI] Deleting OpenAI file...");
+            await openai.files.delete(openAiFileId);
+            console.log("[OpenAI] OpenAI file deleted.");
+          } catch (err) {
+            console.error("[OpenAI] Failed deleting OpenAI file.", err);
+          }
+        }
+
+        // 3.3 Delete from Firebase Storage
+        if (storagePath) {
+          try {
+            console.log("[Storage] Deleting storage file:", storagePath);
+            await admin.storage().bucket().file(storagePath).delete();
+            console.log("[Storage] Storage file deleted.");
+          } catch (err) {
+            console.error("[Storage] Failed deleting storage file.", err);
+          }
+        }
+
+        // 3.4 Delete material Firestore doc
+        console.log("[Firestore] Deleting material doc:", materialId);
+        await courseRef.collection("materials").doc(materialId).delete();
+      }
+
+      // 4️⃣ Delete vector store itself
+      if (vectorStoreId) {
+        try {
+          console.log("[OpenAI] Deleting vector store...");
+          await openai.vectorStores.delete(vectorStoreId);
+          console.log("[OpenAI] Vector store deleted.");
+        } catch (err) {
+          console.error("[OpenAI] Failed to delete vector store:", err);
+        }
+      }
+
+      // 5️⃣ Delete course document LAST
+      console.log("[Firestore] Deleting course document...");
+      await courseRef.delete();
+      console.log("[Firestore] Course deleted.");
+
+      console.log("========== DELETE COURSE COMPLETE ==========");
+      return {
+        message: "Course successfully deleted along with all materials.",
+      };
+    } catch (error: any) {
+      console.error("========== DELETE COURSE ERROR ==========");
+      console.error("[Error Message]:", error.message);
+      console.error("[Full Error]:", error);
+
+      const requestId =
+        error?.response?.headers?.["x-request-id"] ??
+        error?.response?.headers?.get?.("x-request-id");
+
+      if (requestId) console.error("[OpenAI Request ID]:", requestId);
+
+      throw new HttpsError(
+        "internal",
+        `Failed to delete course: ${error.message ?? "Unknown error"}`
+      );
+    }
+  }
+);

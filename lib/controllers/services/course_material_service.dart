@@ -77,7 +77,13 @@ class CourseMaterialService {
     required String courseId,
     required String materialId,
   }) async {
-    await _materialsRef(creatorId, courseId).doc(materialId).delete();
+    await FirebaseFunctions.instanceFor(
+      region: 'northamerica-northeast2',
+    ).httpsCallable('deleteMaterial').call({
+      'userId': creatorId,
+      'courseId': courseId,
+      'materialId': materialId,
+    });
   }
 
   Future<void> uploadAndIndex({

@@ -52,7 +52,7 @@ class HomePage extends ConsumerWidget {
                     },
                   ),
                   onTap: () {
-                    context.goNamed(
+                    context.pushNamed(
                       'courseDetail',
                       pathParameters: {'courseId': course.id},
                     );

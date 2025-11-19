@@ -71,6 +71,16 @@ class CourseDetailPage extends ConsumerWidget {
                             IconButton(
                               icon: const Icon(Icons.delete_outline),
                               onPressed: () async {
+                                if (m.status == MaterialStatus.indexing) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Cannot delete while indexing.',
+                                      ),
+                                    ),
+                                  );
+                                  return;
+                                }
                                 await ref
                                     .read(
                                       courseMaterialListProvider((

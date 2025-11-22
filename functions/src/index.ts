@@ -436,3 +436,230 @@ export const deleteCourse = onCall(
     }
   }
 );
+
+export const generateQuiz = onCall(
+  {
+    region: "northamerica-northeast2",
+    secrets: [OPENAI_KEY],
+    timeoutSeconds: 300,
+  },
+  async (req) => {
+    const {
+      userId,
+      courseId,
+      vectorStoreId,
+      materialIds,
+      fileIds,
+      numQuestions,
+    } = req.data ?? {};
+
+    // Basic validation
+    if (!userId || !courseId || !vectorStoreId) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Missing required fields: userId, courseId, vectorStoreId."
+      );
+    }
+
+    if (!Array.isArray(materialIds) || materialIds.length === 0) {
+      throw new HttpsError(
+        "invalid-argument",
+        "materialIds must be a non-empty array."
+      );
+    }
+
+    if (!Array.isArray(fileIds) || fileIds.length === 0) {
+      throw new HttpsError(
+        "invalid-argument",
+        "fileIds must be a non-empty array of OpenAI file IDs."
+      );
+    }
+
+    const numQ: number =
+      typeof numQuestions === "number" && numQuestions > 0 ? numQuestions : 5; // default
+
+    const db = admin.firestore();
+    const openai = new OpenAI({ apiKey: OPENAI_KEY.value() });
+
+    // Create quiz doc ref
+    const quizRef = db
+      .collection("users")
+      .doc(userId)
+      .collection("courses")
+      .doc(courseId)
+      .collection("quizzes")
+      .doc();
+
+    const quizId = quizRef.id;
+
+    console.log("========== GENERATE QUIZ START ==========");
+    console.log("[Input]", req.data);
+    console.log("[Quiz ID]", quizId);
+
+    try {
+      // Prompt that matches your Dart models
+      const prompt = `
+You are a strict quiz generator for course material.
+
+Create ${numQ} randomized multiple-choice questions (MCQs) grounded ONLY in the
+provided course material (PDFs and vector store search). Do NOT use any outside
+knowledge or facts that are not directly supported by the material.
+
+Each question must:
+- Focus on important concepts from the material.
+- Be clear and unambiguous.
+- Have exactly one correct answer.
+- Have 3–5 options in total.
+- Be answerable purely from the provided material.
+
+Return ONLY a JSON object with this exact shape (no markdown, no extra keys):
+
+{
+  "questions": [
+    {
+      "id": "string",                       // unique question id (e.g., "q1", "q2", etc.)
+      "prompt": "string",                   // the question text
+      "options": [
+        {
+          "id": "string",                   // unique option id (e.g., "o1", "o2", etc.)
+          "text": "string",                 // option text
+          "isCorrect": true | false         // exactly ONE option must be true
+        }
+      ],
+      "multipleCorrectAllowed": false,      // always false for now
+      "explanation": "string"               // short explanation of the correct answer
+    }
+  ]
+}
+
+Rules:
+- Use ONLY facts that appear in the provided material.
+- If a fact is not explicitly in the material, do NOT mention it.
+- Do NOT include any commentary or text outside of the JSON object.
+`;
+
+      console.log("[OpenAI] Calling responses.create for quiz generation...");
+
+      const response = await openai.responses.create({
+        model: "gpt-4o",
+        temperature: 0.7,
+        tools: [
+          {
+            type: "file_search",
+            vector_store_ids: [vectorStoreId],
+          },
+        ],
+        input: [
+          {
+            role: "system",
+            content: [
+              {
+                type: "input_text",
+                text: "You are a helpful quiz generator that strictly uses the provided course materials.",
+              },
+            ],
+          },
+          {
+            role: "user",
+            content: [
+              {
+                type: "input_text",
+                text: prompt,
+              },
+              // Attach each selected file so the model can read them directly
+              ...fileIds.map((fileId: string) => ({
+                type: "input_file" as const,
+                file_id: fileId,
+              })),
+            ],
+          },
+        ],
+      });
+
+      const raw = response.output_text;
+      console.log("[OpenAI Raw Response]", raw);
+
+      if (!raw) {
+        throw new HttpsError(
+          "internal",
+          "OpenAI returned an empty response. Quiz generation failed."
+        );
+      }
+
+      let quizJson: any;
+      try {
+        quizJson = JSON.parse(raw);
+      } catch (parseErr) {
+        console.error("[Parse Error]", parseErr);
+        throw new HttpsError(
+          "internal",
+          "OpenAI returned invalid JSON. Quiz generation failed."
+        );
+      }
+
+      if (!quizJson.questions || !Array.isArray(quizJson.questions)) {
+        throw new HttpsError(
+          "internal",
+          "Invalid quiz format from OpenAI: missing 'questions' array."
+        );
+      }
+
+      // Optional sanity check: ensure each question has options + exactly one correct
+      for (const q of quizJson.questions) {
+        if (!q.options || !Array.isArray(q.options) || q.options.length === 0) {
+          throw new HttpsError(
+            "internal",
+            "Invalid quiz format from OpenAI: each question must have options."
+          );
+        }
+
+        const correctCount = q.options.filter(
+          (o: any) => o.isCorrect === true
+        ).length;
+        if (correctCount !== 1) {
+          console.warn(
+            "[Warning] Question does not have exactly one correct option. Correcting format."
+          );
+        }
+      }
+
+      const now = admin.firestore.FieldValue.serverTimestamp();
+
+      const quizData = {
+        id: quizId,
+        courseId,
+        creatorId: userId,
+        vectorStoreId,
+        materialIds,
+        numQuestions: quizJson.questions.length,
+        status: "ready",
+        questions: quizJson.questions,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      console.log("[Firestore] Saving quiz document...");
+      await quizRef.set(quizData);
+
+      console.log("========== GENERATE QUIZ COMPLETE ==========");
+      return quizData;
+    } catch (error: any) {
+      console.error("========== GENERATE QUIZ ERROR ==========");
+      console.error("[Error Message]:", error.message);
+      console.error("[Full Error]:", error);
+
+      const requestId =
+        error?.response?.headers?.["x-request-id"] ??
+        error?.response?.headers?.get?.("x-request-id");
+
+      if (requestId) {
+        console.error("[OpenAI Request ID]:", requestId);
+      }
+
+      throw new HttpsError(
+        "internal",
+        `Quiz generation failed: ${error.message ?? "Unknown error"}`
+      );
+    }
+  }
+);

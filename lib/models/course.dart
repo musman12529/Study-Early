@@ -4,10 +4,11 @@ import 'package:uuid/uuid.dart';
 class Course {
   final String id;
   final String creatorId;
-  String title;
-  DateTime createdAt = DateTime.now();
-  DateTime updatedAt = DateTime.now();
-  String? vectorStoreId;
+  final String title;
+  final String? vectorStoreId;
+
+  final DateTime createdAt;
+  final DateTime updatedAt;
 
   Course({
     String? id,
@@ -25,21 +26,32 @@ class Course {
       'id': id,
       'creatorId': creatorId,
       'title': title,
+      'vectorStoreId': vectorStoreId,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
-      'vectorStoreId': vectorStoreId,
     };
   }
 
   static Course fromMap(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
     final map = doc.data();
     return Course(
-      id: map['id'] as String,
-      creatorId: map['creatorId'] as String,
-      title: map['title'] as String,
-      vectorStoreId: map['vectorStoreId'] as String?,
+      id: map['id'],
+      creatorId: map['creatorId'],
+      title: map['title'],
+      vectorStoreId: map['vectorStoreId'],
       createdAt: (map['createdAt'] as Timestamp).toDate(),
       updatedAt: (map['updatedAt'] as Timestamp).toDate(),
+    );
+  }
+
+  Course copyWith({String? title, String? vectorStoreId}) {
+    return Course(
+      id: id,
+      creatorId: creatorId,
+      title: title ?? this.title,
+      vectorStoreId: vectorStoreId ?? this.vectorStoreId,
+      createdAt: createdAt,
+      updatedAt: DateTime.now(),
     );
   }
 }

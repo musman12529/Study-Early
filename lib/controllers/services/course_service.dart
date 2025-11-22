@@ -39,7 +39,8 @@ class CourseService {
 
   Future<void> updateCourse(Course course) async {
     await _userCourses(course.creatorId).doc(course.id).update({
-      ...course.toMap(),
+      'title': course.title,
+      'vectorStoreId': course.vectorStoreId,
       'updatedAt': Timestamp.fromDate(DateTime.now()),
     });
   }

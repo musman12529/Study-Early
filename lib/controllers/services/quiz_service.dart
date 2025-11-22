@@ -9,6 +9,17 @@ class QuizService {
 
   final FirebaseFirestore _firestore;
 
+  DocumentReference<Map<String, dynamic>> _courseRef(
+    String creatorId,
+    String courseId,
+  ) {
+    return _firestore
+        .collection('users')
+        .doc(creatorId)
+        .collection('courses')
+        .doc(courseId);
+  }
+
   CollectionReference<Map<String, dynamic>> _quizzesRef(
     String creatorId,
     String courseId,
@@ -45,18 +56,50 @@ class QuizService {
     required List<String> materialIds,
     required int numQuestions,
   }) async {
+    // Load course to get vectorStoreId
+    final courseSnap = await _courseRef(creatorId, courseId).get();
+    final courseData = courseSnap.data();
+    final vectorStoreId = courseData?['vectorStoreId'] as String?;
+    if (vectorStoreId == null || vectorStoreId.isEmpty) {
+      throw StateError(
+        'Course is not indexed yet. Missing vector store. Please index materials first.',
+      );
+    }
+
+    // Resolve OpenAI file IDs for the selected materials
+    final materialsRef = _courseRef(
+      creatorId,
+      courseId,
+    ).collection('materials');
+    final List<String> fileIds = [];
+    // Firestore whereIn is limited; fetch each selected material doc
+    for (final mid in materialIds) {
+      final doc = await materialsRef.doc(mid).get();
+      if (!doc.exists) continue;
+      final openAiFileId = doc.data()?['openAiFileId'] as String?;
+      if (openAiFileId != null && openAiFileId.isNotEmpty) {
+        fileIds.add(openAiFileId);
+      }
+    }
+
+    if (fileIds.isEmpty) {
+      throw StateError('No indexed files found for the selected materials.');
+    }
+
     final result =
         await FirebaseFunctions.instanceFor(
           region: 'northamerica-northeast2',
         ).httpsCallable('generateQuiz').call({
           'userId': creatorId,
           'courseId': courseId,
+          'vectorStoreId': vectorStoreId,
           'materialIds': materialIds,
+          'fileIds': fileIds,
           'numQuestions': numQuestions,
         });
 
     final data = result.data as Map<String, dynamic>;
-    return data['quizId'] as String;
+    return (data['id'] ?? data['quizId']) as String;
   }
 
   Stream<List<QuizAttempt>> watchAttempts({

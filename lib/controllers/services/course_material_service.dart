@@ -76,6 +76,7 @@ class CourseMaterialService {
     required String creatorId,
     required String courseId,
     required String materialId,
+    bool deleteQuizzes = false,
   }) async {
     await FirebaseFunctions.instanceFor(
       region: 'northamerica-northeast2',
@@ -83,6 +84,7 @@ class CourseMaterialService {
       'userId': creatorId,
       'courseId': courseId,
       'materialId': materialId,
+      'deleteQuizzes': deleteQuizzes,
     });
   }
 

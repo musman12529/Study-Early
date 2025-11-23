@@ -61,6 +61,21 @@ class CourseMaterialListNotifier
       creatorId: creatorId,
       courseId: courseId,
       materialId: materialId,
+      deleteQuizzes: false,
+    );
+  }
+
+  Future<void> removeWithOption({
+    required String materialId,
+    required bool deleteQuizzes,
+  }) async {
+    final creatorId = arg.$1;
+    final courseId = arg.$2;
+    await _service.deleteMaterial(
+      creatorId: creatorId,
+      courseId: courseId,
+      materialId: materialId,
+      deleteQuizzes: deleteQuizzes,
     );
   }
 

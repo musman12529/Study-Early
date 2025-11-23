@@ -47,13 +47,15 @@ class QuizListPage extends ConsumerWidget {
                                     : Colors.orange),
                         ),
                         title: Text(
-                          'Quiz • ${q.numQuestions} questions',
+                          q.title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                         subtitle: Text(
-                          'Status: ${q.status.asString} • '
-                          '${_formatDateTime(q.createdAt)}',
+                          '${_formatDateTime(q.createdAt)} • '
+                          '${q.numQuestions} questions • '
+                          '${q.materialIds.length} materials • '
+                          'Status: ${q.status.asString}',
                         ),
                         trailing: PopupMenuButton<String>(
                           onSelected: (value) {

@@ -25,6 +25,7 @@ class Quiz {
   final String id;
   final String courseId;
   final String creatorId;
+  final String title;
 
   /// Snapshot of the vector store used for generation (from Course.vectorStoreId)
   final String? vectorStoreId;
@@ -43,6 +44,7 @@ class Quiz {
     String? id,
     required this.courseId,
     required this.creatorId,
+    String? title,
     required this.vectorStoreId,
     required this.materialIds,
     required this.numQuestions,
@@ -51,6 +53,7 @@ class Quiz {
     DateTime? createdAt,
     DateTime? updatedAt,
   }) : id = id ?? const Uuid().v4(),
+       title = title ?? 'Untitled Quiz',
        createdAt = createdAt ?? DateTime.now(),
        updatedAt = updatedAt ?? DateTime.now();
 
@@ -59,6 +62,7 @@ class Quiz {
       'id': id,
       'courseId': courseId,
       'creatorId': creatorId,
+      'title': title,
       'vectorStoreId': vectorStoreId,
       'materialIds': materialIds,
       'numQuestions': numQuestions,
@@ -76,6 +80,7 @@ class Quiz {
       id: map['id'],
       courseId: map['courseId'],
       creatorId: map['creatorId'],
+      title: (map['title'] as String?) ?? 'Untitled Quiz',
       vectorStoreId: map['vectorStoreId'],
       materialIds: (map['materialIds'] as List<dynamic>? ?? []).cast<String>(),
       numQuestions: map['numQuestions'] ?? 0,
@@ -89,6 +94,7 @@ class Quiz {
   }
 
   Quiz copyWith({
+    String? title,
     String? vectorStoreId,
     List<String>? materialIds,
     int? numQuestions,
@@ -99,6 +105,7 @@ class Quiz {
       id: id,
       courseId: courseId,
       creatorId: creatorId,
+      title: title ?? this.title,
       vectorStoreId: vectorStoreId ?? this.vectorStoreId,
       materialIds: materialIds ?? this.materialIds,
       numQuestions: numQuestions ?? this.numQuestions,

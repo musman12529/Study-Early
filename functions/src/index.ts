@@ -515,6 +515,7 @@ Each question must:
 Return ONLY a JSON object with this exact shape (no markdown, no extra keys):
 
 {
+  "title": "string",                      // concise, human-friendly quiz title (<= 30 chars)
   "questions": [
     {
       "id": "string",                       // unique question id (e.g., "q1", "q2", etc.)
@@ -536,6 +537,7 @@ Rules:
 - Use ONLY facts that appear in the provided material.
 - If a fact is not explicitly in the material, do NOT mention it.
 - Do NOT include any commentary or text outside of the JSON object.
+- Output must be valid JSON only. Do NOT use backticks or code fences.
 `;
 
       console.log("[OpenAI] Calling responses.create for quiz generation...");
@@ -590,12 +592,73 @@ Rules:
       try {
         quizJson = JSON.parse(raw);
       } catch (parseErr) {
-        console.error("[Parse Error]", parseErr);
-        throw new HttpsError(
-          "internal",
-          "OpenAI returned invalid JSON. Quiz generation failed."
+        console.warn(
+          "[Parse Warning] Raw output not valid JSON, attempting cleanup…"
         );
+        // 1) Strip common markdown code fences
+        let cleaned = raw
+          .replace(/```json/gi, "")
+          .replace(/```/g, "")
+          .trim();
+        // 2) Try parse cleaned
+        try {
+          quizJson = JSON.parse(cleaned);
+        } catch (parseErr2) {
+          // 3) Extract substring between first '{' and last '}' as fallback
+          const first = cleaned.indexOf("{");
+          const last = cleaned.lastIndexOf("}");
+          if (first !== -1 && last !== -1 && last > first) {
+            const slice = cleaned.slice(first, last + 1);
+            try {
+              quizJson = JSON.parse(slice);
+            } catch (parseErr3) {
+              console.error("[Parse Error after cleanup]", parseErr3);
+              throw new HttpsError(
+                "internal",
+                "OpenAI returned invalid JSON after cleanup. Quiz generation failed."
+              );
+            }
+          } else {
+            console.error(
+              "[Parse Error] Could not locate JSON object in output."
+            );
+            throw new HttpsError(
+              "internal",
+              "OpenAI returned non-JSON content. Quiz generation failed."
+            );
+          }
+        }
       }
+
+      // Derive base title and ensure uniqueness
+      const baseTitleRaw: string =
+        typeof quizJson.title === "string" && quizJson.title.trim().length > 0
+          ? quizJson.title.trim()
+          : "Quiz";
+      // trim overly long titles
+      const baseTitle =
+        baseTitleRaw.length > 60 ? baseTitleRaw.slice(0, 60) : baseTitleRaw;
+
+      // Load all existing quiz titles in this course to ensure uniqueness
+      const quizzesColl = quizRef.parent;
+      const allQuizzesSnap = await quizzesColl.get();
+      const existingTitles = new Set(
+        allQuizzesSnap.docs
+          .map((d) => (d.data() as any)?.title)
+          .filter((t) => typeof t === "string" && t.length > 0)
+      );
+
+      const makeUniqueTitle = (t: string, taken: Set<string>) => {
+        if (!taken.has(t)) return t;
+        let i = 1;
+        let candidate = `${t} (${i})`;
+        while (taken.has(candidate)) {
+          i += 1;
+          candidate = `${t} (${i})`;
+        }
+        return candidate;
+      };
+      const uniqueTitle = makeUniqueTitle(baseTitle, existingTitles);
 
       if (!quizJson.questions || !Array.isArray(quizJson.questions)) {
         throw new HttpsError(
@@ -631,6 +694,7 @@ Rules:
         creatorId: userId,
         vectorStoreId,
         materialIds,
+        title: uniqueTitle,
         numQuestions: quizJson.questions.length,
         status: "ready",
         questions: quizJson.questions,

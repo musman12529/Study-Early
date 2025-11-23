@@ -157,7 +157,7 @@ export const deleteMaterial = onCall(
     timeoutSeconds: 120,
   },
   async (req) => {
-    const { userId, courseId, materialId } = req.data;
+    const { userId, courseId, materialId, deleteQuizzes } = req.data ?? {};
 
     if (!userId || !courseId || !materialId) {
       throw new HttpsError(
@@ -263,6 +263,47 @@ export const deleteMaterial = onCall(
       console.log("[Firestore] Deleting material document...");
       await materialRef.delete();
       console.log("[Firestore] Material document deleted.");
+
+      // Optionally delete quizzes referencing this material
+      if (deleteQuizzes === true) {
+        console.log(
+          "[Quizzes] deleteQuizzes=true. Searching for quizzes referencing this material..."
+        );
+        const quizzesRef = courseRef.collection("quizzes");
+        const affectedSnap = await quizzesRef
+          .where("materialIds", "array-contains", materialId)
+          .get();
+        console.log(`[Quizzes] Found ${affectedSnap.size} affected quizzes.`);
+
+        for (const q of affectedSnap.docs) {
+          const qref = q.ref;
+          const qid = q.id;
+          // Delete attempts in batches
+          const attemptsSnap = await qref.collection("attempts").get();
+          console.log(
+            `[Quizzes] Deleting ${attemptsSnap.size} attempts for quiz ${qid}...`
+          );
+          let batch = db.batch();
+          let count = 0;
+          for (const a of attemptsSnap.docs) {
+            batch.delete(a.ref);
+            count += 1;
+            if (count >= 450) {
+              await batch.commit();
+              batch = db.batch();
+              count = 0;
+            }
+          }
+          if (count > 0) await batch.commit();
+          await qref.delete();
+          console.log(`[Quizzes] Deleted quiz ${qid}.`);
+        }
+        console.log("[Quizzes] Quiz cleanup complete.");
+      } else {
+        console.log(
+          "[Quizzes] deleteQuizzes not set; leaving quizzes unchanged."
+        );
+      }
 
       console.log("========== DELETE MATERIAL COMPLETE ==========");
       return { message: "Material successfully deleted." };

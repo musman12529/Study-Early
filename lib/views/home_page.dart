@@ -79,7 +79,9 @@ class HomePage extends ConsumerWidget {
                       if (confirm != true) return;
 
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("Deleting course…")),
+                        const SnackBar(
+                          content: _DeletingSnackBar(label: "Deleting course…"),
+                        ),
                       );
 
                       try {
@@ -154,6 +156,26 @@ class HomePage extends ConsumerWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _DeletingSnackBar extends StatelessWidget {
+  const _DeletingSnackBar({required this.label});
+  final String label;
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: const [
+        SizedBox(
+          width: 16,
+          height: 16,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+        SizedBox(width: 8),
+        // Use a Flexible Text to avoid overflow in some locales
+        Expanded(child: Text("Deleting course…")),
+      ],
     );
   }
 }

@@ -9,6 +9,8 @@ import '../controllers/providers/course_material_provider.dart';
 import '../controllers/providers/quiz_providers.dart';
 import '../models/course_material.dart';
 
+enum _DeleteMaterialChoice { materialOnly, materialAndQuizzes }
+
 class CourseDetailPage extends ConsumerStatefulWidget {
   const CourseDetailPage({super.key, required this.courseId});
 
@@ -22,7 +24,7 @@ class _CourseDetailPageState extends ConsumerState<CourseDetailPage> {
   final Set<String> _selectedMaterialIds = {};
   bool _isUploading = false;
   bool _isGenerating = false;
-
+  final Set<String> _deletingMaterialIds = {};
   @override
   Widget build(BuildContext context) {
     final ref = this.ref;
@@ -96,32 +98,135 @@ class _CourseDetailPageState extends ConsumerState<CourseDetailPage> {
                                 },
                               ),
                             const SizedBox(width: 8),
-                            IconButton(
-                              icon: const Icon(Icons.delete_outline),
-                              onPressed: () async {
-                                if (m.status == MaterialStatus.indexing) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Cannot delete while indexing.',
-                                      ),
+                            _deletingMaterialIds.contains(m.id)
+                                ? const SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
                                     ),
-                                  );
-                                  return;
-                                }
-                                await ref
-                                    .read(
-                                      courseMaterialListProvider((
-                                        user.uid,
-                                        widget.courseId,
-                                      )).notifier,
-                                    )
-                                    .remove(m.id);
-                                setState(() {
-                                  _selectedMaterialIds.remove(m.id);
-                                });
-                              },
-                            ),
+                                  )
+                                : IconButton(
+                                    icon: const Icon(Icons.delete_outline),
+                                    onPressed: () async {
+                                      if (m.status == MaterialStatus.indexing) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              'Cannot delete while indexing.',
+                                            ),
+                                          ),
+                                        );
+                                        return;
+                                      }
+                                      final choice =
+                                          await showDialog<
+                                            _DeleteMaterialChoice
+                                          >(
+                                            context: context,
+                                            builder: (context) {
+                                              return AlertDialog(
+                                                title: const Text(
+                                                  'Delete material?',
+                                                ),
+                                                content: const Text(
+                                                  'Do you also want to delete quizzes that reference this material?',
+                                                ),
+                                                actions: [
+                                                  TextButton(
+                                                    onPressed: () =>
+                                                        Navigator.pop(
+                                                          context,
+                                                          null,
+                                                        ),
+                                                    child: const Text('Cancel'),
+                                                  ),
+                                                  TextButton(
+                                                    onPressed: () =>
+                                                        Navigator.pop(
+                                                          context,
+                                                          _DeleteMaterialChoice
+                                                              .materialOnly,
+                                                        ),
+                                                    child: const Text(
+                                                      'Material only',
+                                                    ),
+                                                  ),
+                                                  TextButton(
+                                                    onPressed: () =>
+                                                        Navigator.pop(
+                                                          context,
+                                                          _DeleteMaterialChoice
+                                                              .materialAndQuizzes,
+                                                        ),
+                                                    child: const Text(
+                                                      'Material + quizzes',
+                                                      style: TextStyle(
+                                                        color: Colors.red,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              );
+                                            },
+                                          );
+                                      if (choice == null) return;
+                                      final deleteQuizzes =
+                                          choice ==
+                                          _DeleteMaterialChoice
+                                              .materialAndQuizzes;
+                                      setState(() {
+                                        _deletingMaterialIds.add(m.id);
+                                      });
+                                      try {
+                                        await ref
+                                            .read(
+                                              courseMaterialListProvider((
+                                                user.uid,
+                                                widget.courseId,
+                                              )).notifier,
+                                            )
+                                            .removeWithOption(
+                                              materialId: m.id,
+                                              deleteQuizzes: deleteQuizzes,
+                                            );
+                                        if (mounted) {
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                'Material deleted.',
+                                              ),
+                                            ),
+                                          );
+                                        }
+                                        setState(() {
+                                          _selectedMaterialIds.remove(m.id);
+                                        });
+                                      } catch (e) {
+                                        if (mounted) {
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                'Failed to delete material: $e',
+                                              ),
+                                            ),
+                                          );
+                                        }
+                                      } finally {
+                                        if (mounted) {
+                                          setState(() {
+                                            _deletingMaterialIds.remove(m.id);
+                                          });
+                                        }
+                                      }
+                                    },
+                                  ),
                           ],
                         ),
                       ),

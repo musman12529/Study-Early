@@ -103,8 +103,22 @@ class QuizListPage extends ConsumerWidget {
                                 if (ok != true) return;
                                 final messenger = ScaffoldMessenger.of(context);
                                 messenger.showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Deleting quiz…'),
+                                  SnackBar(
+                                    content: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.start,
+                                      children: const [
+                                        SizedBox(
+                                          width: 16,
+                                          height: 16,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        ),
+                                        SizedBox(width: 8),
+                                        Text('Deleting quiz…'),
+                                      ],
+                                    ),
                                   ),
                                 );
                                 try {

@@ -11,6 +11,28 @@ class QuizListPage extends ConsumerWidget {
 
   final String courseId;
 
+  Future<bool?> _confirmDelete(BuildContext context) {
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete quiz?'),
+        content: const Text(
+          'This will permanently delete the quiz and all its attempts.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authStateChangesProvider);
@@ -76,6 +98,39 @@ class QuizListPage extends ConsumerWidget {
                                   'quizId': q.id,
                                 },
                               );
+                            } else if (value == 'delete') {
+                              _confirmDelete(context).then((ok) async {
+                                if (ok != true) return;
+                                final messenger = ScaffoldMessenger.of(context);
+                                messenger.showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Deleting quiz…'),
+                                  ),
+                                );
+                                try {
+                                  await ref
+                                      .read(
+                                        quizListProvider((
+                                          user.uid,
+                                          courseId,
+                                        )).notifier,
+                                      )
+                                      .remove(quizId: q.id);
+                                  messenger.showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Quiz deleted.'),
+                                    ),
+                                  );
+                                } catch (e) {
+                                  messenger.showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        'Failed to delete quiz: $e',
+                                      ),
+                                    ),
+                                  );
+                                }
+                              });
                             }
                           },
                           itemBuilder: (context) => [
@@ -87,6 +142,13 @@ class QuizListPage extends ConsumerWidget {
                             const PopupMenuItem(
                               value: 'attempts',
                               child: Text('View attempts'),
+                            ),
+                            const PopupMenuItem(
+                              value: 'delete',
+                              child: Text(
+                                'Delete quiz',
+                                style: TextStyle(color: Colors.red),
+                              ),
                             ),
                           ],
                         ),

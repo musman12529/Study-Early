@@ -102,6 +102,16 @@ class QuizService {
     return (data['id'] ?? data['quizId']) as String;
   }
 
+  Future<void> deleteQuiz({
+    required String creatorId,
+    required String courseId,
+    required String quizId,
+  }) async {
+    await FirebaseFunctions.instanceFor(region: 'northamerica-northeast2')
+        .httpsCallable('deleteQuiz')
+        .call({'userId': creatorId, 'courseId': courseId, 'quizId': quizId});
+  }
+
   Stream<List<QuizAttempt>> watchAttempts({
     required String creatorId,
     required String courseId,

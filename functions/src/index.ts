@@ -727,3 +727,78 @@ Rules:
     }
   }
 );
+
+export const deleteQuiz = onCall(
+  {
+    region: "northamerica-northeast2",
+    secrets: [OPENAI_KEY],
+    timeoutSeconds: 120,
+  },
+  async (req) => {
+    const { userId, courseId, quizId } = req.data ?? {};
+    if (!userId || !courseId || !quizId) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Missing required fields: userId, courseId, quizId."
+      );
+    }
+
+    const db = admin.firestore();
+    const quizRef = db
+      .collection("users")
+      .doc(userId)
+      .collection("courses")
+      .doc(courseId)
+      .collection("quizzes")
+      .doc(quizId);
+
+    console.log("========== DELETE QUIZ START ==========");
+    console.log("[Input]", req.data);
+
+    try {
+      const snap = await quizRef.get();
+      if (!snap.exists) {
+        console.log("[Firestore] Quiz already deleted.");
+        return { message: "Already deleted." };
+      }
+
+      const attemptsSnap = await quizRef.collection("attempts").get();
+      console.log(`[Firestore] Found ${attemptsSnap.size} attempts.`);
+
+      // Firestore limits 500 ops per batch; chunk deletes if needed
+      const attemptsDocs = attemptsSnap.docs;
+      let batch = db.batch();
+      let count = 0;
+
+      for (const doc of attemptsDocs) {
+        batch.delete(doc.ref);
+        count += 1;
+        if (count >= 450) {
+          await batch.commit();
+          batch = db.batch();
+          count = 0;
+        }
+      }
+      if (count > 0) {
+        await batch.commit();
+      }
+
+      // Delete the quiz document last
+      await quizRef.delete();
+      console.log("========== DELETE QUIZ COMPLETE ==========");
+      return { message: "Quiz and attempts deleted." };
+    } catch (error: any) {
+      console.error("========== DELETE QUIZ ERROR ==========");
+      console.error("[Error Message]:", error.message);
+      console.error("[Full Error]:", error);
+      const requestId =
+        error?.response?.headers?.["x-request-id"] ??
+        error?.response?.headers?.get?.("x-request-id");
+      if (requestId) console.error("[OpenAI Request ID]:", requestId);
+      throw new HttpsError(
+        "internal",
+        `Failed to delete quiz: ${error.message ?? "Unknown error"}`
+      );
+    }
+  }
+);

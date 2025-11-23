@@ -43,6 +43,16 @@ class QuizListNotifier
       numQuestions: numQuestions,
     );
   }
+
+  Future<void> remove({required String quizId}) async {
+    final creatorId = arg.$1;
+    final courseId = arg.$2;
+    await _service.deleteQuiz(
+      creatorId: creatorId,
+      courseId: courseId,
+      quizId: quizId,
+    );
+  }
 }
 
 class QuizAttemptsNotifier

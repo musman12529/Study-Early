@@ -52,8 +52,12 @@ class HomePage extends ConsumerWidget {
                           return AlertDialog(
                             title: const Text("Delete Course?"),
                             content: const Text(
-                              "This will permanently delete all materials, OpenAI vector store data, and "
-                              "PDF files for this course. This action cannot be undone.",
+                              "This will permanently delete:\n"
+                              "• All materials and their PDF files\n"
+                              "• OpenAI vector store data\n"
+                              "• All quizzes in this course\n"
+                              "• All attempts for those quizzes\n\n"
+                              "This action cannot be undone.",
                             ),
                             actions: [
                               TextButton(

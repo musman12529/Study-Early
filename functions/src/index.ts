@@ -398,6 +398,39 @@ export const deleteCourse = onCall(
         await courseRef.collection("materials").doc(materialId).delete();
       }
 
+      // 3️⃣b Delete quizzes and their attempts
+      console.log("[Firestore] Loading quizzes...");
+      const quizzesSnap = await courseRef.collection("quizzes").get();
+      console.log(`[Firestore] Found ${quizzesSnap.size} quizzes.`);
+
+      for (const quizDoc of quizzesSnap.docs) {
+        const quizId = quizDoc.id;
+        console.log("----- Deleting Quiz:", quizId);
+
+        // Delete attempts subcollection in batches
+        const attemptsSnap = await quizDoc.ref.collection("attempts").get();
+        console.log(
+          `[Attempts] Found ${attemptsSnap.size} attempts for quiz ${quizId}.`
+        );
+
+        let batch = db.batch();
+        let count = 0;
+        for (const a of attemptsSnap.docs) {
+          batch.delete(a.ref);
+          count += 1;
+          if (count >= 450) {
+            await batch.commit();
+            batch = db.batch();
+            count = 0;
+          }
+        }
+        if (count > 0) await batch.commit();
+
+        // Delete the quiz document
+        await quizDoc.ref.delete();
+        console.log(`[Firestore] Quiz ${quizId} deleted.`);
+      }
+
       // 4️⃣ Delete vector store itself
       if (vectorStoreId) {
         try {

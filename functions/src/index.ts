@@ -876,3 +876,185 @@ export const deleteQuiz = onCall(
     }
   }
 );
+
+export const chatWithCourse = onCall(
+  {
+    region: "northamerica-northeast2",
+    secrets: [OPENAI_KEY],
+    timeoutSeconds: 60,
+  },
+  async (req) => {
+    const { userId, courseId, message, conversationHistory } = req.data ?? {};
+
+    // Validate required fields
+    if (!userId || !courseId || !message) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Missing required fields: userId, courseId, message."
+      );
+    }
+
+    if (typeof message !== "string" || message.trim().length === 0) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Message must be a non-empty string."
+      );
+    }
+
+    const db = admin.firestore();
+    const openai = new OpenAI({ apiKey: OPENAI_KEY.value() });
+
+    const courseRef = db
+      .collection("users")
+      .doc(userId)
+      .collection("courses")
+      .doc(courseId);
+
+    console.log("========== CHAT WITH COURSE START ==========");
+    console.log("[Input]", { userId, courseId, messageLength: message.length });
+
+    try {
+      // 1️⃣ Fetch course document to get vectorStoreId
+      console.log("[Firestore] Fetching course document...");
+      const courseSnap = await courseRef.get();
+      if (!courseSnap.exists) {
+        throw new HttpsError("not-found", "Course not found.");
+      }
+
+      const courseData = courseSnap.data() as { vectorStoreId?: string };
+      const vectorStoreId = courseData?.vectorStoreId;
+
+      if (!vectorStoreId) {
+        throw new HttpsError(
+          "failed-precondition",
+          "Course does not have a vector store. Please upload and index materials first."
+        );
+      }
+
+      console.log("[Course] vectorStoreId:", vectorStoreId);
+
+      // 2️⃣ Fetch all indexed materials to get their openAiFileIds
+      console.log("[Firestore] Fetching indexed materials...");
+      const materialsSnap = await courseRef
+        .collection("materials")
+        .where("status", "==", "indexed")
+        .get();
+
+      const fileIds: string[] = [];
+      for (const doc of materialsSnap.docs) {
+        const material = doc.data() as { openAiFileId?: string };
+        if (material.openAiFileId) {
+          fileIds.push(material.openAiFileId);
+        }
+      }
+
+      console.log(`[Materials] Found ${fileIds.length} indexed files.`);
+
+      if (fileIds.length === 0) {
+        throw new HttpsError(
+          "failed-precondition",
+          "No indexed materials found for this course. Please upload and index materials first."
+        );
+      }
+
+      // 3️⃣ Build conversation messages
+      const messages: any[] = [
+        {
+          role: "system",
+          content: [
+            {
+              type: "input_text",
+              text: "You are a helpful tutor that answers questions about the provided study material.",
+            },
+          ],
+        },
+      ];
+
+      // Add conversation history if provided
+      if (Array.isArray(conversationHistory)) {
+        for (const msg of conversationHistory) {
+          if (msg.role && msg.content) {
+            messages.push({
+              role: msg.role,
+              content: [
+                {
+                  type: "input_text",
+                  text: msg.content,
+                },
+              ],
+            });
+          }
+        }
+      }
+
+      // Add current user message with file attachments
+      messages.push({
+        role: "user",
+        content: [
+          {
+            type: "input_text",
+            text: message.trim(),
+          },
+          // Attach all indexed files
+          ...fileIds.map((fileId: string) => ({
+            type: "input_file" as const,
+            file_id: fileId,
+          })),
+        ],
+      });
+
+      // 4️⃣ Call OpenAI Chat API
+      console.log("[OpenAI] Calling responses.create for chat...");
+      const response = await openai.responses.create({
+        model: "gpt-4o",
+        temperature: 0.4,
+        tools: [
+          {
+            type: "file_search",
+            vector_store_ids: [vectorStoreId],
+          },
+        ],
+        input: messages,
+      });
+
+      const responseText = response.output_text?.trim() || "";
+
+      if (!responseText) {
+        throw new HttpsError(
+          "internal",
+          "OpenAI returned an empty response."
+        );
+      }
+
+      console.log("[OpenAI] Response received, length:", responseText.length);
+      console.log("========== CHAT WITH COURSE COMPLETE ==========");
+
+      return {
+        response: responseText,
+        messageId: response.id || `msg_${Date.now()}`,
+      };
+    } catch (error: any) {
+      console.error("========== CHAT WITH COURSE ERROR ==========");
+      console.error("[Error Message]:", error.message);
+      console.error("[Full Error]:", error);
+
+      // If it's already an HttpsError, re-throw it
+      if (error instanceof HttpsError) {
+        throw error;
+      }
+
+      const requestId =
+        error?.response?.headers?.["x-request-id"] ??
+        error?.response?.headers?.get?.("x-request-id");
+
+      if (requestId) {
+        console.error("[OpenAI Request ID]:", requestId);
+      }
+
+      throw new HttpsError(
+        "internal",
+        `Chat failed: ${error.message ?? "Unknown error"}`
+      );
+    }
+  }
+);

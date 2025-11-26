@@ -8,6 +8,10 @@ import '../views/auth/sign_up_screen.dart';
 import '../views/auth/error_screen.dart';
 import '../controllers/providers/auth_providers.dart';
 import '../views/course_detail_page.dart';
+import '../views/quiz/quiz_list_page.dart';
+import '../views/quiz/quiz_take_page.dart';
+import '../views/quiz/quiz_attempts_page.dart';
+import '../views/quiz/quiz_attempt_detail_page.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authStateChangesProvider);
@@ -66,6 +70,46 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final courseId = state.pathParameters['courseId']!;
           return CourseDetailPage(courseId: courseId);
+        },
+      ),
+      GoRoute(
+        name: 'quizList',
+        path: '/course/:courseId/quizzes',
+        builder: (context, state) {
+          final courseId = state.pathParameters['courseId']!;
+          return QuizListPage(courseId: courseId);
+        },
+      ),
+      GoRoute(
+        name: 'quizTake',
+        path: '/course/:courseId/quiz/:quizId',
+        builder: (context, state) {
+          final courseId = state.pathParameters['courseId']!;
+          final quizId = state.pathParameters['quizId']!;
+          return QuizTakePage(courseId: courseId, quizId: quizId);
+        },
+      ),
+      GoRoute(
+        name: 'quizAttempts',
+        path: '/course/:courseId/quiz/:quizId/attempts',
+        builder: (context, state) {
+          final courseId = state.pathParameters['courseId']!;
+          final quizId = state.pathParameters['quizId']!;
+          return QuizAttemptsPage(courseId: courseId, quizId: quizId);
+        },
+      ),
+      GoRoute(
+        name: 'quizAttemptDetail',
+        path: '/course/:courseId/quiz/:quizId/attempt/:attemptId',
+        builder: (context, state) {
+          final courseId = state.pathParameters['courseId']!;
+          final quizId = state.pathParameters['quizId']!;
+          final attemptId = state.pathParameters['attemptId']!;
+          return QuizAttemptDetailPage(
+            courseId: courseId,
+            quizId: quizId,
+            attemptId: attemptId,
+          );
         },
       ),
     ],

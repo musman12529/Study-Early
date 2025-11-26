@@ -19,7 +19,6 @@ class RoleSelectionPage extends StatelessWidget {
             children: [
               const SizedBox(height: 36),
 
-              /// Logo row
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
@@ -44,7 +43,6 @@ class RoleSelectionPage extends StatelessWidget {
 
               const SizedBox(height: 32),
 
-              /// Student button
               _RoleButton(
                 label: 'Student',
                 assetPath: 'asset/student.png',
@@ -54,7 +52,6 @@ class RoleSelectionPage extends StatelessWidget {
 
               const SizedBox(height: 16),
 
-              /// Professor button
               _RoleButton(
                 label: 'Professor',
                 assetPath: 'asset/prof.png',
@@ -72,7 +69,6 @@ class RoleSelectionPage extends StatelessWidget {
 
               const Spacer(),
 
-              /// Bottom text
               Wrap(
                 alignment: WrapAlignment.center,
                 children: [

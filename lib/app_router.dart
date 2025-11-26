@@ -3,10 +3,11 @@ import 'package:go_router/go_router.dart';
 
 import '../views/home_page.dart';
 import '../views/role_selection_page.dart';
-import '../views/auth/login_screen.dart';
+import '../views/auth/sign_in_screen.dart';
+import '../views/auth/sign_up_screen.dart';
 import '../views/auth/error_screen.dart';
-import 'controllers/providers/auth_providers.dart';
-import 'views/course_detail_page.dart';
+import '../controllers/providers/auth_providers.dart';
+import '../views/course_detail_page.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authStateChangesProvider);
@@ -21,14 +22,17 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       final loggedIn = user != null;
       final goingToLogin = state.matchedLocation == '/login';
+      final goingToSignUp = state.matchedLocation == '/signup';
       final goingToRoleSelection = state.matchedLocation == '/';
 
       if (!loggedIn) {
-        if (goingToLogin || goingToRoleSelection) return null;
+        if (goingToLogin || goingToSignUp || goingToRoleSelection) {
+          return null;
+        }
         return '/login';
       }
 
-      if (goingToLogin || goingToRoleSelection) {
+      if (goingToLogin || goingToSignUp || goingToRoleSelection) {
         return '/home';
       }
 
@@ -49,7 +53,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         name: 'login',
         path: '/login',
-        builder: (context, state) => const LoginScreen(),
+        builder: (context, state) => const SignInScreen(),
+      ),
+      GoRoute(
+        name: 'signup',
+        path: '/signup',
+        builder: (context, state) => const SignUpScreen(),
       ),
       GoRoute(
         name: 'courseDetail',

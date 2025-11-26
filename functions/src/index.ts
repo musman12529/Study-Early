@@ -999,11 +999,16 @@ export const chatWithCourse = onCall(
             typeof msg.content === "string" &&
             msg.content.trim().length > 0
           ) {
+            // OpenAI responses.create API requires:
+            // - user messages: type "input_text"
+            // - assistant messages: type "output_text"
+            const contentType = msg.role === "assistant" ? "output_text" : "input_text";
+            
             messages.push({
               role: msg.role,
               content: [
                 {
-                  type: "input_text",
+                  type: contentType,
                   text: msg.content.trim(),
                 },
               ],

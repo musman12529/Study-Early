@@ -44,7 +44,21 @@ class _CourseDetailPageState extends ConsumerState<CourseDetailPage> {
         );
 
         return Scaffold(
-          appBar: AppBar(title: const Text('Course Materials')),
+          appBar: AppBar(
+            title: const Text('Course Materials'),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.chat_bubble_outline),
+                tooltip: 'Chat with course materials',
+                onPressed: () {
+                  context.pushNamed(
+                    'chat',
+                    pathParameters: {'courseId': widget.courseId},
+                  );
+                },
+              ),
+            ],
+          ),
           body: materials.isEmpty
               ? const Center(child: Text('No materials yet'))
               : ListView.builder(
@@ -316,6 +330,7 @@ class _CourseDetailPageState extends ConsumerState<CourseDetailPage> {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: const ['pdf'],
+      withData: true, // Read file bytes for web compatibility
     );
 
     if (result == null) return;
@@ -326,9 +341,14 @@ class _CourseDetailPageState extends ConsumerState<CourseDetailPage> {
       setState(() {
         _isUploading = true;
       });
+      
       await ref
           .read(courseMaterialListProvider((user.uid, courseId)).notifier)
-          .uploadAndIndex(fileName: picked.name, filePath: picked.path!);
+          .uploadAndIndex(
+            fileName: picked.name,
+            filePath: picked.path,
+            fileBytes: picked.bytes,
+          );
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

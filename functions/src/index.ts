@@ -887,17 +887,33 @@ export const chatWithCourse = onCall(
     const { userId, courseId, message, conversationHistory } = req.data ?? {};
 
     // Validate required fields
-    if (!userId || !courseId || !message) {
+    if (!userId || typeof userId !== "string" || userId.trim().length === 0) {
       throw new HttpsError(
         "invalid-argument",
-        "Missing required fields: userId, courseId, message."
+        "userId must be a non-empty string."
       );
     }
 
-    if (typeof message !== "string" || message.trim().length === 0) {
+    if (!courseId || typeof courseId !== "string" || courseId.trim().length === 0) {
+      throw new HttpsError(
+        "invalid-argument",
+        "courseId must be a non-empty string."
+      );
+    }
+
+    if (!message || typeof message !== "string" || message.trim().length === 0) {
       throw new HttpsError(
         "invalid-argument",
         "Message must be a non-empty string."
+      );
+    }
+
+    // Validate message length (prevent extremely long messages)
+    const trimmedMessage = message.trim();
+    if (trimmedMessage.length > 5000) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Message is too long. Maximum length is 5000 characters."
       );
     }
 
@@ -970,20 +986,35 @@ export const chatWithCourse = onCall(
         },
       ];
 
-      // Add conversation history if provided
+      // Add conversation history if provided (limit to last 10 messages to avoid token limits)
       if (Array.isArray(conversationHistory)) {
-        for (const msg of conversationHistory) {
-          if (msg.role && msg.content) {
+        const historyLimit = 10;
+        const recentHistory = conversationHistory.slice(-historyLimit);
+        
+        for (const msg of recentHistory) {
+          if (
+            msg &&
+            typeof msg === "object" &&
+            (msg.role === "user" || msg.role === "assistant") &&
+            typeof msg.content === "string" &&
+            msg.content.trim().length > 0
+          ) {
             messages.push({
               role: msg.role,
               content: [
                 {
                   type: "input_text",
-                  text: msg.content,
+                  text: msg.content.trim(),
                 },
               ],
             });
           }
+        }
+        
+        if (conversationHistory.length > historyLimit) {
+          console.log(
+            `[Warning] Conversation history truncated from ${conversationHistory.length} to ${historyLimit} messages.`
+          );
         }
       }
 
@@ -993,7 +1024,7 @@ export const chatWithCourse = onCall(
         content: [
           {
             type: "input_text",
-            text: message.trim(),
+            text: trimmedMessage,
           },
           // Attach all indexed files
           ...fileIds.map((fileId: string) => ({
@@ -1002,6 +1033,10 @@ export const chatWithCourse = onCall(
           })),
         ],
       });
+
+      console.log(
+        `[Messages] Built conversation with ${messages.length} messages and ${fileIds.length} file attachments.`
+      );
 
       // 4️⃣ Call OpenAI Chat API
       console.log("[OpenAI] Calling responses.create for chat...");
@@ -1020,18 +1055,22 @@ export const chatWithCourse = onCall(
       const responseText = response.output_text?.trim() || "";
 
       if (!responseText) {
+        console.error("[OpenAI] Empty response received from API.");
         throw new HttpsError(
           "internal",
-          "OpenAI returned an empty response."
+          "OpenAI returned an empty response. Please try again."
         );
       }
 
-      console.log("[OpenAI] Response received, length:", responseText.length);
+      const messageId = response.id || `msg_${Date.now()}`;
+      console.log(
+        `[OpenAI] Response received successfully. Length: ${responseText.length}, Message ID: ${messageId}`
+      );
       console.log("========== CHAT WITH COURSE COMPLETE ==========");
 
       return {
         response: responseText,
-        messageId: response.id || `msg_${Date.now()}`,
+        messageId: messageId,
       };
     } catch (error: any) {
       console.error("========== CHAT WITH COURSE ERROR ==========");

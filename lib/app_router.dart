@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../views/home_page.dart';
+import '../views/role_selection_page.dart';
 import '../views/auth/login_screen.dart';
 import '../views/auth/error_screen.dart';
 import 'controllers/providers/auth_providers.dart';
@@ -16,14 +17,19 @@ final routerProvider = Provider<GoRouter>((ref) {
     debugLogDiagnostics: true,
 
     redirect: (context, state) {
-      final loggingIn = state.matchedLocation == '/login';
+      if (authState.isLoading) return null;
 
-      if (user == null) {
-        return loggingIn ? null : '/login';
+      final loggedIn = user != null;
+      final goingToLogin = state.matchedLocation == '/login';
+      final goingToRoleSelection = state.matchedLocation == '/';
+
+      if (!loggedIn) {
+        if (goingToLogin || goingToRoleSelection) return null;
+        return '/login';
       }
 
-      if (loggingIn) {
-        return '/';
+      if (goingToLogin || goingToRoleSelection) {
+        return '/home';
       }
 
       return null;
@@ -31,8 +37,13 @@ final routerProvider = Provider<GoRouter>((ref) {
 
     routes: [
       GoRoute(
-        name: 'home',
+        name: 'roleSelection',
         path: '/',
+        builder: (context, state) => const RoleSelectionPage(),
+      ),
+      GoRoute(
+        name: 'home',
+        path: '/home',
         builder: (context, state) => const HomePage(),
       ),
       GoRoute(

@@ -1,5 +1,8 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
-import { onDocumentUpdated } from "firebase-functions/v2/firestore";
+import {
+  onDocumentUpdated,
+  onDocumentWritten,
+} from "firebase-functions/v2/firestore";
 import { defineSecret } from "firebase-functions/params";
 import * as admin from "firebase-admin";
 import OpenAI from "openai";
@@ -1261,23 +1264,26 @@ export const onMaterialStatusUpdated = onDocumentUpdated(
   }
 );
 
-export const onQuizStatusUpdated = onDocumentUpdated(
+export const onQuizStatusUpdated = onDocumentWritten(
   {
     region: REGION,
     document: "users/{userId}/courses/{courseId}/quizzes/{quizId}",
   },
   async (event) => {
-    if (!event.data) return;
+    const before = event.data?.before?.data() as
+      | Record<string, any>
+      | undefined;
+    const after = event.data?.after?.data() as
+      | Record<string, any>
+      | undefined;
 
-    const before = event.data.before.data() as Record<string, any> | undefined;
-    const after = event.data.after.data() as Record<string, any> | undefined;
+    if (!after) return;
 
-    if (!before || !after) return;
-
-    const beforeStatus = before.status;
+    const beforeStatus = before?.status;
     const afterStatus = after.status;
 
-    if (!afterStatus || beforeStatus === afterStatus) return;
+    if (!afterStatus) return;
+    if (beforeStatus === afterStatus && event.data?.before?.exists) return;
 
     const userId = event.params.userId as string;
     const courseId = event.params.courseId as string;

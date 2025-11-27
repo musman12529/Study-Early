@@ -138,6 +138,8 @@ class _NotificationTile extends StatelessWidget {
         return Icons.file_present_outlined;
       case NotificationType.materialIndexFailed:
         return Icons.error_outline;
+      case NotificationType.quizGenerating:
+        return Icons.auto_fix_high_outlined;
       case NotificationType.quizReady:
         return Icons.quiz_outlined;
       case NotificationType.quizAttemptGraded:

@@ -786,6 +786,16 @@ Rules:
       console.log("[Firestore] Saving quiz document...");
       await quizRef.set(quizData);
 
+      await dispatchNotification({
+        userId,
+        courseId,
+        quizId,
+        type: "quizReady",
+        title: "Quiz ready",
+        body: `Quiz for "${uniqueTitle}" has been generated and is ready to attempt.`,
+        metadata: { status: "ready" },
+      });
+
       console.log("========== GENERATE QUIZ COMPLETE ==========");
       return quizData;
     } catch (error: any) {
@@ -1283,7 +1293,8 @@ export const onQuizStatusUpdated = onDocumentWritten(
     const afterStatus = after.status;
 
     if (!afterStatus) return;
-    if (beforeStatus === afterStatus && event.data?.before?.exists) return;
+    const hadDocumentBefore = event.data?.before?.exists ?? false;
+    if (hadDocumentBefore && beforeStatus === afterStatus) return;
 
     const userId = event.params.userId as string;
     const courseId = event.params.courseId as string;
@@ -1291,13 +1302,14 @@ export const onQuizStatusUpdated = onDocumentWritten(
     const quizTitle = after.title ?? "Quiz";
 
     if (afterStatus === "ready") {
+      if (!hadDocumentBefore) return; // creation already handled in generateQuiz
       await dispatchNotification({
         userId,
         courseId,
         quizId,
         type: "quizReady",
         title: "Quiz ready",
-        body: `"${quizTitle}" is ready to review and publish.`,
+        body: `Quiz for "${quizTitle}" has been generated and is ready to attempt.`,
         metadata: { status: afterStatus },
       });
       return;

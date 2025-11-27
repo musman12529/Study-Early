@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../controllers/providers/auth_providers.dart';
 import '../controllers/providers/course_providers.dart';
+import 'widgets/notification_bell_button.dart';
 
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
@@ -26,6 +27,12 @@ class HomePage extends ConsumerWidget {
           appBar: AppBar(
             title: const Text('Home Page'),
             actions: [
+              NotificationBellButton(
+                userId: user.uid,
+                onPressed: () {
+                  context.pushNamed('notifications');
+                },
+              ),
               IconButton(
                 icon: const Icon(Icons.logout),
                 onPressed: () async {

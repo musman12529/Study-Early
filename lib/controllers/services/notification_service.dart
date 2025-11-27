@@ -42,17 +42,27 @@ class NotificationService {
     await _initializeLocalNotifications();
     await _ensureForegroundPresentationOptions();
 
-    final settings = await _messaging.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-      carPlay: false,
-      criticalAlert: false,
-      provisional: false,
-      announcement: false,
-    );
+    AuthorizationStatus? status;
+    try {
+      final settings = await _messaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+        carPlay: false,
+        criticalAlert: false,
+        provisional: false,
+        announcement: false,
+      );
+      status = settings.authorizationStatus;
+    } catch (error, stackTrace) {
+      debugPrint(
+        '[NotificationService] requestPermission failed: $error\n$stackTrace',
+      );
+      return;
+    }
 
-    if (settings.authorizationStatus == AuthorizationStatus.denied) {
+    if (status == AuthorizationStatus.denied ||
+        status == AuthorizationStatus.notDetermined) {
       debugPrint('[NotificationService] Permission denied');
       return;
     }

@@ -255,12 +255,12 @@ class CourseDetailPage extends ConsumerWidget {
                                                       deleteQuizzes: false,
                                                     );
                                               } else if (choice == 'all') {
-                                                await ref
-                                                    .read(
-                                                      courseMaterialListProvider(
-                                                        (user.uid, courseId),
-                                                      ).notifier,
-                                                    )
+                                            await ref
+                                                .read(
+                                                  courseMaterialListProvider(
+                                                    (user.uid, courseId),
+                                                  ).notifier,
+                                                )
                                                     .removeWithOption(
                                                       materialId: m.id,
                                                       deleteQuizzes: true,
@@ -339,8 +339,8 @@ class CourseDetailPage extends ConsumerWidget {
                                         ScaffoldMessenger.of(
                                           context,
                                         ).showSnackBar(
-                                          const SnackBar(
-                                            content: Text(
+                                        const SnackBar(
+                                          content: Text(
                                               'Select at least one material first.',
                                             ),
                                           ),
@@ -480,9 +480,9 @@ class CourseDetailPage extends ConsumerWidget {
                                             MaterialPageRoute(
                                               builder: (_) => QuizListPage(
                                                 courseId: courseId,
-                                              ),
-                                            ),
-                                          );
+                                          ),
+                                        ),
+                                      );
                                         }
                                       } catch (e) {
                                         messenger.showSnackBar(

@@ -1,4 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { onDocumentUpdated } from "firebase-functions/v2/firestore";
 import { defineSecret } from "firebase-functions/params";
 import * as admin from "firebase-admin";
 import OpenAI from "openai";
@@ -7,6 +8,9 @@ import * as os from "os";
 import * as fs from "fs";
 
 admin.initializeApp();
+const db = admin.firestore();
+const messaging = admin.messaging();
+const REGION = "northamerica-northeast2";
 
 const OPENAI_KEY = defineSecret("OPENAI_API_KEY");
 
@@ -1110,6 +1114,277 @@ Your responses should be clean, readable plain text that displays well in a chat
         "internal",
         `Chat failed: ${error.message ?? "Unknown error"}`
       );
+    }
+  }
+);
+
+type NotificationPayload = {
+  userId: string;
+  title: string;
+  body: string;
+  type: string;
+  courseId?: string;
+  materialId?: string;
+  quizId?: string;
+  metadata?: Record<string, unknown>;
+};
+
+async function dispatchNotification(payload: NotificationPayload) {
+  const {
+    userId,
+    title,
+    body,
+    type: notificationType,
+    courseId,
+    materialId,
+    quizId,
+    metadata,
+  } = payload;
+
+  const notificationRef = await db
+    .collection("users")
+    .doc(userId)
+    .collection("notifications")
+    .add({
+      title,
+      body,
+      type: notificationType,
+      status: "unread",
+      courseId: courseId ?? null,
+      materialId: materialId ?? null,
+      quizId: quizId ?? null,
+      metadata: metadata ?? {},
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+  const notificationId = notificationRef.id;
+
+  const tokensSnap = await db
+    .collection("users")
+    .doc(userId)
+    .collection("deviceTokens")
+    .where("active", "==", true)
+    .get();
+
+  const tokens = tokensSnap.docs
+    .map((doc) => (doc.data().token as string) ?? doc.id)
+    .filter((token) => Boolean(token));
+
+  if (tokens.length === 0) {
+    console.log(
+      "[Notifications] No active tokens found for user. Stored only in Firestore.",
+      userId
+    );
+    return;
+  }
+
+  const dataPayload: Record<string, string> = {
+    type: notificationType,
+    notificationId,
+  };
+  if (courseId) dataPayload.courseId = courseId;
+  if (materialId) dataPayload.materialId = materialId;
+  if (quizId) dataPayload.quizId = quizId;
+
+  for (const chunk of chunkArray(tokens, 500)) {
+    try {
+      await messaging.sendEachForMulticast({
+        tokens: chunk,
+        notification: {
+          title,
+          body,
+        },
+        data: dataPayload,
+      });
+    } catch (error) {
+      console.error("[Notifications] Failed to send push notification", error);
+    }
+  }
+}
+
+function chunkArray<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+}
+
+export const onMaterialStatusUpdated = onDocumentUpdated(
+  {
+    region: REGION,
+    document: "users/{userId}/courses/{courseId}/materials/{materialId}",
+  },
+  async (event) => {
+    if (!event.data) return;
+
+    const before = event.data.before.data() as Record<string, any> | undefined;
+    const after = event.data.after.data() as Record<string, any> | undefined;
+
+    if (!before || !after) return;
+
+    const beforeStatus = before.status;
+    const afterStatus = after.status;
+
+    if (!afterStatus || beforeStatus === afterStatus) return;
+
+    const userId = event.params.userId as string;
+    const courseId = event.params.courseId as string;
+    const materialId = event.params.materialId as string;
+    const fileName = after.fileName ?? "Material";
+
+    if (afterStatus === "indexed") {
+      await dispatchNotification({
+        userId,
+        courseId,
+        materialId,
+        type: "materialIndexed",
+        title: "Material indexed",
+        body: `"${fileName}" is ready for chat and quiz generation.`,
+        metadata: { status: afterStatus },
+      });
+      return;
+    }
+
+    if (afterStatus === "error") {
+      const lastError = after.lastError ?? "Please retry indexing.";
+      await dispatchNotification({
+        userId,
+        courseId,
+        materialId,
+        type: "materialIndexFailed",
+        title: "Material indexing failed",
+        body: `"${fileName}" needs your attention: ${lastError}`,
+        metadata: { status: afterStatus, lastError },
+      });
+    }
+  }
+);
+
+export const onQuizStatusUpdated = onDocumentUpdated(
+  {
+    region: REGION,
+    document: "users/{userId}/courses/{courseId}/quizzes/{quizId}",
+  },
+  async (event) => {
+    if (!event.data) return;
+
+    const before = event.data.before.data() as Record<string, any> | undefined;
+    const after = event.data.after.data() as Record<string, any> | undefined;
+
+    if (!before || !after) return;
+
+    const beforeStatus = before.status;
+    const afterStatus = after.status;
+
+    if (!afterStatus || beforeStatus === afterStatus) return;
+
+    const userId = event.params.userId as string;
+    const courseId = event.params.courseId as string;
+    const quizId = event.params.quizId as string;
+    const quizTitle = after.title ?? "Quiz";
+
+    if (afterStatus === "ready") {
+      await dispatchNotification({
+        userId,
+        courseId,
+        quizId,
+        type: "quizReady",
+        title: "Quiz ready",
+        body: `"${quizTitle}" is ready to review and publish.`,
+        metadata: { status: afterStatus },
+      });
+      return;
+    }
+
+    if (afterStatus === "error") {
+      const lastError = after.lastError ?? "Unknown error";
+      await dispatchNotification({
+        userId,
+        courseId,
+        quizId,
+        type: "system",
+        title: "Quiz generation failed",
+        body: `"${quizTitle}" could not be generated: ${lastError}`,
+        metadata: { status: afterStatus, lastError },
+      });
+    }
+  }
+);
+
+export const onQuizAttemptCompleted = onDocumentUpdated(
+  {
+    region: REGION,
+    document:
+      "users/{userId}/courses/{courseId}/quizzes/{quizId}/attempts/{attemptId}",
+  },
+  async (event) => {
+    if (!event.data) return;
+
+    const before = event.data.before.data() as Record<string, any> | undefined;
+    const after = event.data.after.data() as Record<string, any> | undefined;
+
+    if (!before || !after) return;
+
+    const beforeCompleted = before.completedAt;
+    const afterCompleted = after.completedAt;
+
+    if (!afterCompleted || beforeCompleted) return;
+
+    const userId = event.params.userId as string;
+    const courseId = event.params.courseId as string;
+    const quizId = event.params.quizId as string;
+    const attemptId = event.params.attemptId as string;
+
+    const numCorrect = Number(after.numCorrect ?? 0);
+    const numTotal = Number(after.numTotal ?? 0);
+    const attemptOwner = after.userId as string | undefined;
+
+    const quizSnap = await db
+      .collection("users")
+      .doc(userId)
+      .collection("courses")
+      .doc(courseId)
+      .collection("quizzes")
+      .doc(quizId)
+      .get();
+
+    const quizData = quizSnap.data() as { title?: string } | undefined;
+    const quizTitle = quizData?.title ?? "Quiz";
+
+    const percent =
+      numTotal > 0 ? Math.round((numCorrect / numTotal) * 100) : null;
+    const scoreLabel = percent
+      ? `${numCorrect}/${numTotal} (${percent}%)`
+      : `${numCorrect}/${numTotal}`;
+
+    const metadata = {
+      attemptId,
+      numCorrect,
+      numTotal,
+      studentId: attemptOwner ?? null,
+    };
+
+    await dispatchNotification({
+      userId,
+      courseId,
+      quizId,
+      type: "quizAttemptGraded",
+      title: "Quiz attempt graded",
+      body: `Attempt for "${quizTitle}" scored ${scoreLabel}.`,
+      metadata,
+    });
+
+    if (attemptOwner && attemptOwner !== userId) {
+      await dispatchNotification({
+        userId: attemptOwner,
+        courseId,
+        quizId,
+        type: "quizAttemptGraded",
+        title: `Your score: ${numCorrect}/${numTotal}`,
+        body: `"${quizTitle}" has been graded. Tap to review your answers.`,
+        metadata: { ...metadata, recipient: "student" },
+      });
     }
   }
 );

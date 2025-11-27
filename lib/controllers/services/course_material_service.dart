@@ -1,8 +1,10 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 import '../../models/course_material.dart';
 
@@ -92,18 +94,29 @@ class CourseMaterialService {
     required String creatorId,
     required String courseId,
     required String fileName,
-    required String filePath,
+    String? filePath,
+    Uint8List? fileBytes,
   }) async {
     final sanitized = fileName.replaceAll(RegExp(r'[^a-zA-Z0-9_.-]'), '_');
     final storagePath =
         'users/$creatorId/courses/$courseId/materials/${DateTime.now().millisecondsSinceEpoch}-$sanitized';
 
     final storageRef = FirebaseStorage.instance.ref(storagePath);
+    final metadata = SettableMetadata(contentType: 'application/pdf');
 
-    await storageRef.putFile(
-      File(filePath),
-      SettableMetadata(contentType: 'application/pdf'),
-    );
+    if (kIsWeb) {
+      // Web: use bytes
+      if (fileBytes == null) {
+        throw ArgumentError('fileBytes is required for web platform');
+      }
+      await storageRef.putData(fileBytes, metadata);
+    } else {
+      // Mobile: use file path
+      if (filePath == null) {
+        throw ArgumentError('filePath is required for mobile platform');
+      }
+      await storageRef.putFile(File(filePath), metadata);
+    }
 
     final downloadUrl = await storageRef.getDownloadURL();
 

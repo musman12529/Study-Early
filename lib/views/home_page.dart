@@ -88,6 +88,7 @@ class HomePage extends ConsumerWidget {
                             context.pushNamed(
                               'courseDetail',
                               pathParameters: {'courseId': course.id},
+                              queryParameters: {'title': course.title},
                             );
                           },
                           child: Container(

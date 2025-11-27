@@ -8,9 +8,14 @@ import '../controllers/providers/course_material_provider.dart';
 import '../models/course_material.dart';
 
 class CourseDetailPage extends ConsumerWidget {
-  const CourseDetailPage({super.key, required this.courseId});
+  const CourseDetailPage({
+    super.key,
+    required this.courseId,
+    required this.courseTitle,
+  });
 
   final String courseId;
+  final String courseTitle;
 
   static const Color _brandBlue = Color(0xFF1A73E8);
   static const Color _navy = Color(0xFF101828);
@@ -81,7 +86,7 @@ class CourseDetailPage extends ConsumerWidget {
 
                   // COURSE TITLE
                   Text(
-                    courseId,
+                    courseTitle,
                     style: const TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.w800,
@@ -180,10 +185,9 @@ class CourseDetailPage extends ConsumerWidget {
                                             }
                                             await ref
                                                 .read(
-                                                  courseMaterialListProvider((
-                                                    user.uid,
-                                                    courseId,
-                                                  )).notifier,
+                                                  courseMaterialListProvider(
+                                                    (user.uid, courseId),
+                                                  ).notifier,
                                                 )
                                                 .remove(m.id);
                                           },
@@ -200,22 +204,11 @@ class CourseDetailPage extends ConsumerWidget {
                                             );
                                             await ref
                                                 .read(
-                                                  courseMaterialListProvider((
-                                                    user.uid,
-                                                    courseId,
-                                                  )).notifier,
+                                                  courseMaterialListProvider(
+                                                    (user.uid, courseId),
+                                                  ).notifier,
                                                 )
                                                 .retry(m);
-                                          },
-                                          onExtraAction: () {
-                                            ScaffoldMessenger.of(context)
-                                                .showSnackBar(
-                                              const SnackBar(
-                                                content: Text(
-                                                  'Feature will be implemented later',
-                                                ),
-                                              ),
-                                            );
                                           },
                                         ),
                                     ],
@@ -419,20 +412,25 @@ class CourseDetailPage extends ConsumerWidget {
   }
 }
 
-class _MaterialRow extends StatelessWidget {
+class _MaterialRow extends StatefulWidget {
   const _MaterialRow({
     required this.material,
     required this.showDivider,
     required this.onDelete,
     required this.onRetryIndex,
-    required this.onExtraAction,
   });
 
   final CourseMaterial material;
   final bool showDivider;
   final VoidCallback onDelete;
   final VoidCallback onRetryIndex;
-  final VoidCallback onExtraAction;
+
+  @override
+  State<_MaterialRow> createState() => _MaterialRowState();
+}
+
+class _MaterialRowState extends State<_MaterialRow> {
+  bool _isChecked = false;
 
   @override
   Widget build(BuildContext context) {
@@ -457,10 +455,11 @@ class _MaterialRow extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
+
               // File name
               Expanded(
                 child: Text(
-                  material.fileName,
+                  widget.material.fileName,
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
@@ -468,30 +467,41 @@ class _MaterialRow extends StatelessWidget {
                   ),
                 ),
               ),
+
               // Optional retry if error
-              if (material.status == MaterialStatus.error)
+              if (widget.material.status == MaterialStatus.error)
                 IconButton(
                   tooltip: 'Retry indexing',
                   icon: const Icon(Icons.refresh),
-                  onPressed: onRetryIndex,
+                  onPressed: widget.onRetryIndex,
                 ),
+
               // Delete
               IconButton(
                 icon: const Icon(Icons.delete_outline),
-                onPressed: onDelete,
+                onPressed: widget.onDelete,
               ),
-              // Extra action (red checklist icon)
+
+              // Toggle checkbox
               IconButton(
-                icon: const Icon(
-                  Icons.checklist_rtl,
-                  color: CourseDetailPage._accentRed,
+                icon: Icon(
+                  _isChecked
+                      ? Icons.check_box
+                      : Icons.check_box_outline_blank,
+                  color: _isChecked
+                      ? CourseDetailPage._accentRed
+                      : Colors.grey,
                 ),
-                onPressed: onExtraAction,
+                onPressed: () {
+                  setState(() {
+                    _isChecked = !_isChecked;
+                  });
+                },
               ),
             ],
           ),
         ),
-        if (showDivider)
+        if (widget.showDivider)
           Divider(
             height: 0,
             thickness: 0.5,

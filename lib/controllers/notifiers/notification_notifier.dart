@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../models/notification_item.dart';
+import '../services/notification_repository.dart';
 
 class NotificationState {
   const NotificationState({
@@ -36,77 +37,28 @@ const _sentinel = Object();
 class NotificationListNotifier
     extends FamilyNotifier<NotificationState, String> {
   StreamSubscription<List<NotificationItem>>? _subscription;
-  bool _initialized = false;
+  final NotificationRepository _repository = NotificationRepository();
 
   @override
   NotificationState build(String userId) {
     _subscription?.cancel();
-
     state = const NotificationState(isLoading: true);
-
-    /// Placeholder stream until Firestore-backed implementation arrives.
-    if (!_initialized) {
-      _initialized = true;
-      _primeMockNotifications();
-    }
+    _subscription = _repository.watchNotifications(userId).listen(
+      (items) {
+        state = NotificationState(notifications: items, isLoading: false);
+      },
+      onError: (error, stackTrace) {
+        state = state.copyWith(isLoading: false, error: error);
+      },
+    );
 
     ref.onDispose(() => _subscription?.cancel());
     return state;
   }
 
-  void _primeMockNotifications() {
-    final mockStream = Stream<List<NotificationItem>>.fromFuture(
-      Future<List<NotificationItem>>.delayed(
-        const Duration(milliseconds: 250),
-        () => _buildMockNotifications(),
-      ),
-    );
-
-    _subscription = mockStream.listen(
-      (items) => state = NotificationState(
-        notifications: items,
-        isLoading: false,
-      ),
-      onError: (error, _) =>
-          state = state.copyWith(isLoading: false, error: error),
-    );
-  }
-
-  List<NotificationItem> _buildMockNotifications() {
-    final now = DateTime.now();
-    return [
-      NotificationItem(
-        id: 'preview-material-indexed',
-        title: 'Material indexed',
-        body: '“Week 02 Slides.pdf” is ready for chat and quiz generation.',
-        type: NotificationType.materialIndexed,
-        status: NotificationStatus.unread,
-        createdAt: now.subtract(const Duration(minutes: 4)),
-        courseId: 'course-demo',
-        materialId: 'material-1',
-      ),
-      NotificationItem(
-        id: 'preview-quiz-ready',
-        title: 'Quiz ready to publish',
-        body: 'Auto-generated quiz for “Midterm Prep” is ready for review.',
-        type: NotificationType.quizReady,
-        status: NotificationStatus.unread,
-        createdAt: now.subtract(const Duration(hours: 1, minutes: 12)),
-        quizId: 'quiz-demo',
-        courseId: 'course-demo',
-      ),
-      NotificationItem(
-        id: 'preview-upload-complete',
-        title: 'Upload complete',
-        body: '“Lab instructions.pdf” finished uploading and is queued.',
-        type: NotificationType.system,
-        status: NotificationStatus.read,
-        createdAt: now.subtract(const Duration(hours: 6)),
-      ),
-    ];
-  }
-
-  void markAllAsRead() {
+  Future<void> markAllAsRead() async {
+    final userId = arg;
+    await _repository.markAllRead(userId);
     state = state.copyWith(
       notifications: state.notifications
           .map((n) => n.isUnread ? n.markAsRead() : n)
@@ -114,7 +66,9 @@ class NotificationListNotifier
     );
   }
 
-  void markAsRead(String id) {
+  Future<void> markAsRead(String id) async {
+    final userId = arg;
+    await _repository.markRead(userId, id);
     state = state.copyWith(
       notifications: state.notifications.map((notification) {
         if (notification.id != id) return notification;

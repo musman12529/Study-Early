@@ -28,9 +28,9 @@ class _SignInScreenState extends State<SignInScreen> {
         password: _passwordController.text,
       );
     } on FirebaseAuthException catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message ?? 'Sign in error')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message ?? 'Sign in error')));
     } catch (_) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -40,6 +40,81 @@ class _SignInScreenState extends State<SignInScreen> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _showResetPasswordDialog() async {
+    final controller = TextEditingController(
+      text: _emailController.text.trim(),
+    );
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Reset password'),
+          content: TextField(
+            controller: controller,
+            keyboardType: TextInputType.emailAddress,
+            decoration: const InputDecoration(
+              labelText: 'Email',
+              prefixIcon: Icon(Icons.mail),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                final email = controller.text.trim();
+                if (email.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please enter your email')),
+                  );
+                  return;
+                }
+                Navigator.of(context).pop();
+                try {
+                  await FirebaseAuth.instance.sendPasswordResetEmail(
+                    email: email,
+                  );
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'If an account exists for that email, a reset link has been sent.',
+                      ),
+                    ),
+                  );
+                } on FirebaseAuthException catch (e) {
+                  String message;
+                  switch (e.code) {
+                    case 'invalid-email':
+                      message = 'Please enter a valid email address';
+                      break;
+                    default:
+                      message =
+                          e.message ??
+                          'Failed to send password reset email. Please try again.';
+                  }
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text(message)));
+                } catch (_) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'An unexpected error occurred while sending reset email',
+                      ),
+                    ),
+                  );
+                }
+              },
+              child: const Text('Send reset link'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   InputDecoration _inputDecoration() {
@@ -82,10 +157,7 @@ class _SignInScreenState extends State<SignInScreen> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Image.asset(
-                      'asset/logo.png',
-                      height: 40,
-                    ),
+                    Image.asset('asset/logo.png', height: 40),
                     const SizedBox(width: 8),
                   ],
                 ),
@@ -108,10 +180,7 @@ class _SignInScreenState extends State<SignInScreen> {
                 child: Text(
                   'Welcome back! Please enter your details.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFF667085),
-                  ),
+                  style: TextStyle(fontSize: 14, color: Color(0xFF667085)),
                 ),
               ),
 
@@ -124,10 +193,7 @@ class _SignInScreenState extends State<SignInScreen> {
                   children: [
                     const Text(
                       'Email',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF344054),
-                      ),
+                      style: TextStyle(fontSize: 14, color: Color(0xFF344054)),
                     ),
                     const SizedBox(height: 8),
                     TextFormField(
@@ -144,10 +210,7 @@ class _SignInScreenState extends State<SignInScreen> {
                     const SizedBox(height: 20),
                     const Text(
                       'Password',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF344054),
-                      ),
+                      style: TextStyle(fontSize: 14, color: Color(0xFF344054)),
                     ),
                     const SizedBox(height: 8),
                     TextFormField(
@@ -180,8 +243,9 @@ class _SignInScreenState extends State<SignInScreen> {
                                 width: 20,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  valueColor:
-                                      AlwaysStoppedAnimation<Color>(Colors.white),
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
                                 ),
                               )
                             : const Text(
@@ -194,11 +258,28 @@ class _SignInScreenState extends State<SignInScreen> {
                               ),
                       ),
                     ),
+                    const SizedBox(height: 10),
+                    Align(
+                      alignment: Alignment.center,
+                      child: TextButton(
+                        onPressed: _showResetPasswordDialog,
+                        style: TextButton.styleFrom(
+                          foregroundColor: _accentRed,
+                        ),
+                        child: const Text(
+                          'Forgot password?',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
 
-              const SizedBox(height: 40),
+              const SizedBox(height: 10),
 
               Center(
                 child: Wrap(
@@ -206,10 +287,7 @@ class _SignInScreenState extends State<SignInScreen> {
                   children: [
                     const Text(
                       "Don't have an account? ",
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF667085),
-                      ),
+                      style: TextStyle(fontSize: 14, color: Color(0xFF667085)),
                     ),
                     GestureDetector(
                       onTap: () => context.go('/signup'),

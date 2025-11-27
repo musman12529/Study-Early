@@ -9,3 +9,9 @@ final courseMaterialListProvider =
       List<CourseMaterial>,
       (String creatorId, String courseId)
     >(CourseMaterialListNotifier.new);
+
+/// Holds the set of selected material IDs for a given (creatorId, courseId).
+final selectedMaterialIdsProvider =
+    StateProvider.family<Set<String>, (String creatorId, String courseId)>(
+      (ref, args) => <String>{},
+    );

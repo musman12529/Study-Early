@@ -10,6 +10,7 @@ import '../controllers/providers/course_material_provider.dart';
 import '../models/course_material.dart';
 import '../controllers/providers/quiz_providers.dart';
 import 'quiz/quiz_list_page.dart';
+import 'chat/chat_page.dart';
 
 class CourseDetailPage extends ConsumerWidget {
   const CourseDetailPage({
@@ -552,11 +553,10 @@ class CourseDetailPage extends ConsumerWidget {
                             height: 52,
                             child: OutlinedButton(
                               onPressed: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'Chatbot feature will be implemented later',
-                                    ),
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        ChatPage(courseId: courseId),
                                   ),
                                 );
                               },

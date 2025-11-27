@@ -1,0 +1,21 @@
+<component name="libraryTable">
+  <library name="Flutter Plugins" type="FlutterPluginsLibraryType">
+    <CLASSES>
+      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/cloud_firestore_web-5.1.0" />
+      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/firebase_auth_web-6.1.0" />
+      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/cloud_firestore-6.1.0" />
+      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/file_picker-10.3.7" />
+      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/firebase_core-4.2.1" />
+      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/firebase_app_check-0.4.1+2" />
+      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/cloud_functions-6.0.4" />
+      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/firebase_app_check_web-0.2.2" />
+      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/cloud_functions_web-5.1.0" />
+      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/firebase_core_web-3.3.0" />
+      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/firebase_auth-6.1.2" />
+      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/firebase_storage-13.0.4" />
+      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/firebase_storage_web-3.11.0" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

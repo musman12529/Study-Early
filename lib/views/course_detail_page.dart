@@ -7,8 +7,11 @@ import 'package:go_router/go_router.dart';
 
 import '../controllers/providers/auth_providers.dart';
 import '../controllers/providers/course_material_provider.dart';
+import '../controllers/providers/notification_providers.dart';
 import '../controllers/providers/quiz_providers.dart';
 import '../models/course_material.dart';
+import '../models/notification_item.dart';
+import 'widgets/notification_bell_button.dart';
 
 enum _DeleteMaterialChoice { materialOnly, materialAndQuizzes }
 
@@ -19,6 +22,69 @@ class CourseDetailPage extends ConsumerStatefulWidget {
 
   @override
   ConsumerState<CourseDetailPage> createState() => _CourseDetailPageState();
+}
+
+class _NotificationPreviewSheet extends StatelessWidget {
+  const _NotificationPreviewSheet({required this.notifications});
+
+  final List<NotificationItem> notifications;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Recent notifications',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 16),
+            Expanded(
+              child: ListView.separated(
+                itemCount: notifications.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  final notification = notifications[index];
+                  final subtitle =
+                      '${notification.body}\n${_relativeTime(notification.createdAt)}';
+                  return ListTile(
+                    leading: Icon(
+                      notification.isUnread
+                          ? Icons.circle_notifications
+                          : Icons.notifications_none,
+                      color: notification.isUnread
+                          ? Theme.of(context).colorScheme.primary
+                          : null,
+                    ),
+                    title: Text(notification.title),
+                    subtitle: Text(subtitle),
+                    isThreeLine: true,
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _relativeTime(DateTime timestamp) {
+    final now = DateTime.now();
+    final difference = now.difference(timestamp);
+
+    if (difference.inMinutes < 1) return 'Just now';
+    if (difference.inMinutes < 60) {
+      return '${difference.inMinutes} min ago';
+    }
+    if (difference.inHours < 24) {
+      return '${difference.inHours} hr ago';
+    }
+    return '${difference.inDays} day${difference.inDays == 1 ? '' : 's'} ago';
+  }
 }
 
 class _CourseDetailPageState extends ConsumerState<CourseDetailPage> {
@@ -48,6 +114,10 @@ class _CourseDetailPageState extends ConsumerState<CourseDetailPage> {
           appBar: AppBar(
             title: const Text('Course Materials'),
             actions: [
+              NotificationBellButton(
+                userId: user.uid,
+                onPressed: () => _showNotificationPreview(context, user.uid),
+              ),
               IconButton(
                 icon: Stack(
                   clipBehavior: Clip.none,
@@ -342,6 +412,42 @@ class _CourseDetailPageState extends ConsumerState<CourseDetailPage> {
         );
       },
     );
+  }
+
+  Future<void> _showNotificationPreview(
+    BuildContext context,
+    String userId,
+  ) async {
+    final state = ref.read(notificationListProvider(userId));
+
+    if (state.isLoading) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Loading notifications…')),
+      );
+      return;
+    }
+
+    if (state.notifications.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No notifications yet.')),
+      );
+      return;
+    }
+
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        return _NotificationPreviewSheet(
+          notifications: state.notifications,
+        );
+      },
+    );
+
+    if (!mounted) return;
+    ref.read(notificationListProvider(userId).notifier).markAllAsRead();
   }
 
   Future<void> _pickUploadAndIndex(

@@ -980,7 +980,18 @@ export const chatWithCourse = onCall(
           content: [
             {
               type: "input_text",
-              text: "You are a helpful tutor that answers questions about the provided study material.",
+              text: `You are a helpful tutor that answers questions about the provided study material.
+
+IMPORTANT FORMATTING INSTRUCTIONS:
+- Use plain text only. Do NOT use markdown formatting (no **bold**, *italic*, # headers, etc.)
+- Use simple line breaks and spacing for readability
+- For lists, use numbered lists (1., 2., 3.) or simple dashes (-) instead of markdown bullets
+- Keep paragraphs short and well-spaced
+- Use clear, simple language that is easy to read
+- Avoid special characters that might not render properly
+- If you need to emphasize something, use ALL CAPS sparingly or rephrase for clarity
+
+Your responses should be clean, readable plain text that displays well in a chat interface.`,
             },
           ],
         },

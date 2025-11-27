@@ -3,10 +3,14 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 
 import '../controllers/providers/auth_providers.dart';
 import '../controllers/providers/course_material_provider.dart';
 import '../models/course_material.dart';
+import '../controllers/providers/quiz_providers.dart';
+import 'quiz/quiz_list_page.dart';
+import 'chat/chat_page.dart';
 
 class CourseDetailPage extends ConsumerWidget {
   const CourseDetailPage({
@@ -21,6 +25,7 @@ class CourseDetailPage extends ConsumerWidget {
   static const Color _brandBlue = Color(0xFF1A73E8);
   static const Color _navy = Color(0xFF101828);
   static const Color _accentRed = Color(0xFFFF6B6B);
+  static const int _maxUploadBytes = 20 * 1024 * 1024; // 20 MB limit
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -29,24 +34,24 @@ class CourseDetailPage extends ConsumerWidget {
     return authState.when(
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (err, stack) =>
-          Scaffold(body: Center(child: Text('Error: $err'))),
+      error: (err, stack) => Scaffold(body: Center(child: Text('Error: $err'))),
       data: (user) {
         if (user == null) {
-          return const Scaffold(
-            body: Center(child: Text('Not logged in')),
-          );
+          return const Scaffold(body: Center(child: Text('Not logged in')));
         }
 
-        final materials =
-            ref.watch(courseMaterialListProvider((user.uid, courseId)));
+        final materials = ref.watch(
+          courseMaterialListProvider((user.uid, courseId)),
+        );
+        final selectedIds = ref.watch(
+          selectedMaterialIdsProvider((user.uid, courseId)),
+        );
 
         return Scaffold(
           backgroundColor: Colors.white,
           body: SafeArea(
             child: Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -61,10 +66,7 @@ class CourseDetailPage extends ConsumerWidget {
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Image.asset(
-                            'asset/logo.png',
-                            height: 24,
-                          ),
+                          Image.asset('asset/logo.png', height: 24),
                           const SizedBox(width: 6),
                         ],
                       ),
@@ -136,9 +138,7 @@ class CourseDetailPage extends ConsumerWidget {
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(18),
-                              border: Border.all(
-                                color: Colors.grey.shade300,
-                              ),
+                              border: Border.all(color: Colors.grey.shade300),
                               boxShadow: [
                                 BoxShadow(
                                   blurRadius: 10,
@@ -163,19 +163,21 @@ class CourseDetailPage extends ConsumerWidget {
                                   )
                                 : Column(
                                     children: [
-                                      for (int i = 0;
-                                          i < materials.length;
-                                          i++)
+                                      for (int i = 0; i < materials.length; i++)
                                         _MaterialRow(
                                           material: materials[i],
                                           showDivider:
                                               i != materials.length - 1,
+                                          isSelected: selectedIds.contains(
+                                            materials[i].id,
+                                          ),
                                           onDelete: () async {
                                             final m = materials[i];
                                             if (m.status ==
                                                 MaterialStatus.indexing) {
-                                              ScaffoldMessenger.of(context)
-                                                  .showSnackBar(
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
                                                 const SnackBar(
                                                   content: Text(
                                                     'Cannot delete while indexing.',
@@ -184,18 +186,124 @@ class CourseDetailPage extends ConsumerWidget {
                                               );
                                               return;
                                             }
+                                            final choice = await showDialog<String>(
+                                              context: context,
+                                              builder: (context) {
+                                                return AlertDialog(
+                                                  title: const Text(
+                                                    'Delete material?',
+                                                  ),
+                                                  content: const Text(
+                                                    'Do you also want to delete quizzes that reference this material?',
+                                                  ),
+                                                  actions: [
+                                                    TextButton(
+                                                      onPressed: () =>
+                                                          Navigator.pop(
+                                                            context,
+                                                            'cancel',
+                                                          ),
+                                                      child: const Text(
+                                                        'Cancel',
+                                                      ),
+                                                    ),
+                                                    TextButton(
+                                                      onPressed: () =>
+                                                          Navigator.pop(
+                                                            context,
+                                                            'material',
+                                                          ),
+                                                      child: const Text(
+                                                        'Material only',
+                                                      ),
+                                                    ),
+                                                    TextButton(
+                                                      onPressed: () =>
+                                                          Navigator.pop(
+                                                            context,
+                                                            'all',
+                                                          ),
+                                                      child: const Text(
+                                                        'Material + quizzes',
+                                                        style: TextStyle(
+                                                          color: Colors.red,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                );
+                                              },
+                                            );
+
+                                            if (choice == null ||
+                                                choice == 'cancel') {
+                                              return;
+                                            }
+
+                                            final messenger =
+                                                ScaffoldMessenger.of(context);
+                                            try {
+                                              if (choice == 'material') {
+                                                await ref
+                                                    .read(
+                                                      courseMaterialListProvider(
+                                                        (user.uid, courseId),
+                                                      ).notifier,
+                                                    )
+                                                    .removeWithOption(
+                                                      materialId: m.id,
+                                                      deleteQuizzes: false,
+                                                    );
+                                              } else if (choice == 'all') {
                                             await ref
                                                 .read(
                                                   courseMaterialListProvider(
                                                     (user.uid, courseId),
                                                   ).notifier,
                                                 )
-                                                .remove(m.id);
+                                                    .removeWithOption(
+                                                      materialId: m.id,
+                                                      deleteQuizzes: true,
+                                                    );
+                                              }
+                                              messenger.showSnackBar(
+                                                const SnackBar(
+                                                  content: Text(
+                                                    'Material deleted.',
+                                                  ),
+                                                ),
+                                              );
+                                            } catch (e) {
+                                              messenger.showSnackBar(
+                                                SnackBar(
+                                                  content: Text(
+                                                    'Failed to delete: $e',
+                                                  ),
+                                                ),
+                                              );
+                                            }
+                                          },
+                                          onToggleSelected: () {
+                                            final notifier = ref.read(
+                                              selectedMaterialIdsProvider((
+                                                user.uid,
+                                                courseId,
+                                              )).notifier,
+                                            );
+                                            final current = {...selectedIds};
+                                            final id = materials[i].id;
+                                            if (current.contains(id)) {
+                                              current.remove(id);
+                                            } else {
+                                              current.add(id);
+                                            }
+                                            notifier.state = current;
                                           },
                                           onRetryIndex: () async {
                                             final m = materials[i];
-                                            ScaffoldMessenger.of(context)
-                                                .showSnackBar(
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
                                               const SnackBar(
                                                 content: Text(
                                                   'Retrying indexing...',
@@ -205,9 +313,10 @@ class CourseDetailPage extends ConsumerWidget {
                                             );
                                             await ref
                                                 .read(
-                                                  courseMaterialListProvider(
-                                                    (user.uid, courseId),
-                                                  ).notifier,
+                                                  courseMaterialListProvider((
+                                                    user.uid,
+                                                    courseId,
+                                                  )).notifier,
                                                 )
                                                 .retry(m);
                                           },
@@ -225,21 +334,170 @@ class CourseDetailPage extends ConsumerWidget {
                                 child: SizedBox(
                                   height: 52,
                                   child: ElevatedButton(
-                                    onPressed: () {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
+                                    onPressed: () async {
+                                      if (selectedIds.isEmpty) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
                                         const SnackBar(
                                           content: Text(
-                                            'Generate Quiz feature will be implemented later',
+                                              'Select at least one material first.',
+                                            ),
+                                          ),
+                                        );
+                                        return;
+                                      }
+                                      final controller = TextEditingController(
+                                        text: '5',
+                                      );
+                                      final num = await showDialog<int>(
+                                        context: context,
+                                        builder: (context) {
+                                          String? error;
+                                          return StatefulBuilder(
+                                            builder: (context, setState) {
+                                              return AlertDialog(
+                                                title: const Text(
+                                                  'Generate quiz',
+                                                ),
+                                                content: Column(
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    TextField(
+                                                      controller: controller,
+                                                      keyboardType:
+                                                          TextInputType.number,
+                                                      inputFormatters: [
+                                                        FilteringTextInputFormatter
+                                                            .digitsOnly,
+                                                      ],
+                                                      decoration:
+                                                          const InputDecoration(
+                                                            labelText:
+                                                                'Number of questions',
+                                                          ),
+                                                    ),
+                                                    const SizedBox(height: 8),
+                                                    const Text(
+                                                      'Max 20 questions.',
+                                                      style: TextStyle(
+                                                        color: Colors.black54,
+                                                      ),
+                                                    ),
+                                                    if (error != null)
+                                                      Padding(
+                                                        padding:
+                                                            const EdgeInsets.only(
+                                                              top: 8,
+                                                            ),
+                                                        child: Text(
+                                                          error!,
+                                                          style:
+                                                              const TextStyle(
+                                                                color:
+                                                                    Colors.red,
+                                                              ),
+                                                        ),
+                                                      ),
+                                                  ],
+                                                ),
+                                                actions: [
+                                                  TextButton(
+                                                    onPressed: () =>
+                                                        Navigator.of(
+                                                          context,
+                                                        ).pop(),
+                                                    child: const Text('Cancel'),
+                                                  ),
+                                                  TextButton(
+                                                    onPressed: () {
+                                                      final parsed =
+                                                          int.tryParse(
+                                                            controller.text
+                                                                .trim(),
+                                                          );
+                                                      if (parsed == null ||
+                                                          parsed <= 0) {
+                                                        setState(() {
+                                                          error =
+                                                              'Enter a positive number (max 20).';
+                                                        });
+                                                        return;
+                                                      }
+                                                      if (parsed > 20) {
+                                                        setState(() {
+                                                          error =
+                                                              'Maximum is 20.';
+                                                        });
+                                                        return;
+                                                      }
+                                                      Navigator.of(
+                                                        context,
+                                                      ).pop(parsed);
+                                                    },
+                                                    child: const Text(
+                                                      'Generate',
+                                                    ),
+                                                  ),
+                                                ],
+                                              );
+                                            },
+                                          );
+                                        },
+                                      );
+                                      if (num == null) return;
+                                      final messenger = ScaffoldMessenger.of(
+                                        context,
+                                      );
+                                      messenger.showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Generating quiz…'),
+                                          duration: Duration(seconds: 1),
+                                        ),
+                                      );
+                                      try {
+                                        await ref
+                                            .read(
+                                              quizListProvider((
+                                                user.uid,
+                                                courseId,
+                                              )).notifier,
+                                            )
+                                            .generate(
+                                              materialIds: selectedIds.toList(),
+                                              numQuestions: num,
+                                            );
+                                        messenger.showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Quiz generated.'),
+                                          ),
+                                        );
+                                        if (context.mounted) {
+                                          Navigator.of(context).push(
+                                            MaterialPageRoute(
+                                              builder: (_) => QuizListPage(
+                                                courseId: courseId,
                                           ),
                                         ),
                                       );
+                                        }
+                                      } catch (e) {
+                                        messenger.showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              'Failed to generate quiz: $e',
+                                            ),
+                                          ),
+                                        );
+                                      }
                                     },
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: _brandBlue,
                                       shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(12),
+                                        borderRadius: BorderRadius.circular(12),
                                       ),
                                       elevation: 0,
                                     ),
@@ -260,20 +518,17 @@ class CourseDetailPage extends ConsumerWidget {
                                   height: 52,
                                   child: ElevatedButton(
                                     onPressed: () {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                            'View Quizzes feature will be implemented later',
-                                          ),
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              QuizListPage(courseId: courseId),
                                         ),
                                       );
                                     },
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: _brandBlue,
                                       shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(12),
+                                        borderRadius: BorderRadius.circular(12),
                                       ),
                                       elevation: 0,
                                     ),
@@ -299,11 +554,10 @@ class CourseDetailPage extends ConsumerWidget {
                             height: 52,
                             child: OutlinedButton(
                               onPressed: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'Chatbot feature will be implemented later',
-                                    ),
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        ChatPage(courseId: courseId),
                                   ),
                                 );
                               },
@@ -385,6 +639,16 @@ class CourseDetailPage extends ConsumerWidget {
     if (result == null) return;
 
     final picked = result.files.single;
+    if (picked.size > _maxUploadBytes) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('File too large. Maximum size is 20 MB.'),
+          ),
+        );
+      }
+      return;
+    }
 
     showDialog(
       context: context,
@@ -408,9 +672,9 @@ class CourseDetailPage extends ConsumerWidget {
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     } finally {
       Navigator.of(context).pop();
@@ -418,33 +682,29 @@ class CourseDetailPage extends ConsumerWidget {
   }
 }
 
-class _MaterialRow extends StatefulWidget {
+class _MaterialRow extends StatelessWidget {
   const _MaterialRow({
     required this.material,
     required this.showDivider,
+    required this.isSelected,
     required this.onDelete,
+    required this.onToggleSelected,
     required this.onRetryIndex,
   });
 
   final CourseMaterial material;
   final bool showDivider;
+  final bool isSelected;
   final VoidCallback onDelete;
+  final VoidCallback onToggleSelected;
   final VoidCallback onRetryIndex;
-
-  @override
-  State<_MaterialRow> createState() => _MaterialRowState();
-}
-
-class _MaterialRowState extends State<_MaterialRow> {
-  bool _isChecked = false;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
         Padding(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Row(
             children: [
               // PDF icon
@@ -465,7 +725,7 @@ class _MaterialRowState extends State<_MaterialRow> {
               // File name
               Expanded(
                 child: Text(
-                  widget.material.fileName,
+                  material.fileName,
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
@@ -475,44 +735,32 @@ class _MaterialRowState extends State<_MaterialRow> {
               ),
 
               // Optional retry if error
-              if (widget.material.status == MaterialStatus.error)
+              if (material.status == MaterialStatus.error)
                 IconButton(
                   tooltip: 'Retry indexing',
                   icon: const Icon(Icons.refresh),
-                  onPressed: widget.onRetryIndex,
+                  onPressed: onRetryIndex,
                 ),
 
               // Delete
               IconButton(
                 icon: const Icon(Icons.delete_outline),
-                onPressed: widget.onDelete,
+                onPressed: onDelete,
               ),
 
               // Toggle checkbox
               IconButton(
                 icon: Icon(
-                  _isChecked
-                      ? Icons.check_box
-                      : Icons.check_box_outline_blank,
-                  color: _isChecked
-                      ? CourseDetailPage._accentRed
-                      : Colors.grey,
+                  isSelected ? Icons.check_box : Icons.check_box_outline_blank,
+                  color: isSelected ? CourseDetailPage._accentRed : Colors.grey,
                 ),
-                onPressed: () {
-                  setState(() {
-                    _isChecked = !_isChecked;
-                  });
-                },
+                onPressed: onToggleSelected,
               ),
             ],
           ),
         ),
-        if (widget.showDivider)
-          Divider(
-            height: 0,
-            thickness: 0.5,
-            color: Colors.grey.shade300,
-          ),
+        if (showDivider)
+          Divider(height: 0, thickness: 0.5, color: Colors.grey.shade300),
       ],
     );
   }

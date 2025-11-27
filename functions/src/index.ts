@@ -876,3 +876,240 @@ export const deleteQuiz = onCall(
     }
   }
 );
+
+export const chatWithCourse = onCall(
+  {
+    region: "northamerica-northeast2",
+    secrets: [OPENAI_KEY],
+    timeoutSeconds: 60,
+  },
+  async (req) => {
+    const { userId, courseId, message, conversationHistory } = req.data ?? {};
+
+    // Validate required fields
+    if (!userId || typeof userId !== "string" || userId.trim().length === 0) {
+      throw new HttpsError(
+        "invalid-argument",
+        "userId must be a non-empty string."
+      );
+    }
+
+    if (!courseId || typeof courseId !== "string" || courseId.trim().length === 0) {
+      throw new HttpsError(
+        "invalid-argument",
+        "courseId must be a non-empty string."
+      );
+    }
+
+    if (!message || typeof message !== "string" || message.trim().length === 0) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Message must be a non-empty string."
+      );
+    }
+
+    // Validate message length (prevent extremely long messages)
+    const trimmedMessage = message.trim();
+    if (trimmedMessage.length > 5000) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Message is too long. Maximum length is 5000 characters."
+      );
+    }
+
+    const db = admin.firestore();
+    const openai = new OpenAI({ apiKey: OPENAI_KEY.value() });
+
+    const courseRef = db
+      .collection("users")
+      .doc(userId)
+      .collection("courses")
+      .doc(courseId);
+
+    console.log("========== CHAT WITH COURSE START ==========");
+    console.log("[Input]", { userId, courseId, messageLength: message.length });
+
+    try {
+      // 1️⃣ Fetch course document to get vectorStoreId
+      console.log("[Firestore] Fetching course document...");
+      const courseSnap = await courseRef.get();
+      if (!courseSnap.exists) {
+        throw new HttpsError("not-found", "Course not found.");
+      }
+
+      const courseData = courseSnap.data() as { vectorStoreId?: string };
+      const vectorStoreId = courseData?.vectorStoreId;
+
+      if (!vectorStoreId) {
+        throw new HttpsError(
+          "failed-precondition",
+          "Course does not have a vector store. Please upload and index materials first."
+        );
+      }
+
+      console.log("[Course] vectorStoreId:", vectorStoreId);
+
+      // 2️⃣ Fetch all indexed materials to get their openAiFileIds
+      console.log("[Firestore] Fetching indexed materials...");
+      const materialsSnap = await courseRef
+        .collection("materials")
+        .where("status", "==", "indexed")
+        .get();
+
+      const fileIds: string[] = [];
+      for (const doc of materialsSnap.docs) {
+        const material = doc.data() as { openAiFileId?: string };
+        if (material.openAiFileId) {
+          fileIds.push(material.openAiFileId);
+        }
+      }
+
+      console.log(`[Materials] Found ${fileIds.length} indexed files.`);
+
+      if (fileIds.length === 0) {
+        throw new HttpsError(
+          "failed-precondition",
+          "No indexed materials found for this course. Please upload and index materials first."
+        );
+      }
+
+      // 3️⃣ Build conversation messages
+      const messages: any[] = [
+        {
+          role: "system",
+          content: [
+            {
+              type: "input_text",
+              text: `You are a helpful tutor that answers questions about the provided study material.
+
+IMPORTANT FORMATTING INSTRUCTIONS:
+- Use plain text only. Do NOT use markdown formatting (no **bold**, *italic*, # headers, etc.)
+- Use simple line breaks and spacing for readability
+- For lists, use numbered lists (1., 2., 3.) or simple dashes (-) instead of markdown bullets
+- Keep paragraphs short and well-spaced
+- Use clear, simple language that is easy to read
+- Avoid special characters that might not render properly
+- If you need to emphasize something, use ALL CAPS sparingly or rephrase for clarity
+
+Your responses should be clean, readable plain text that displays well in a chat interface.`,
+            },
+          ],
+        },
+      ];
+
+      // Add conversation history if provided (limit to last 10 messages to avoid token limits)
+      if (Array.isArray(conversationHistory)) {
+        const historyLimit = 10;
+        const recentHistory = conversationHistory.slice(-historyLimit);
+        
+        for (const msg of recentHistory) {
+          if (
+            msg &&
+            typeof msg === "object" &&
+            (msg.role === "user" || msg.role === "assistant") &&
+            typeof msg.content === "string" &&
+            msg.content.trim().length > 0
+          ) {
+            // OpenAI responses.create API requires:
+            // - user messages: type "input_text"
+            // - assistant messages: type "output_text"
+            const contentType = msg.role === "assistant" ? "output_text" : "input_text";
+            
+            messages.push({
+              role: msg.role,
+              content: [
+                {
+                  type: contentType,
+                  text: msg.content.trim(),
+                },
+              ],
+            });
+          }
+        }
+        
+        if (conversationHistory.length > historyLimit) {
+          console.log(
+            `[Warning] Conversation history truncated from ${conversationHistory.length} to ${historyLimit} messages.`
+          );
+        }
+      }
+
+      // Add current user message with file attachments
+      messages.push({
+        role: "user",
+        content: [
+          {
+            type: "input_text",
+            text: trimmedMessage,
+          },
+          // Attach all indexed files
+          ...fileIds.map((fileId: string) => ({
+            type: "input_file" as const,
+            file_id: fileId,
+          })),
+        ],
+      });
+
+      console.log(
+        `[Messages] Built conversation with ${messages.length} messages and ${fileIds.length} file attachments.`
+      );
+
+      // 4️⃣ Call OpenAI Chat API
+      console.log("[OpenAI] Calling responses.create for chat...");
+      const response = await openai.responses.create({
+        model: "gpt-4o",
+        temperature: 0.4,
+        tools: [
+          {
+            type: "file_search",
+            vector_store_ids: [vectorStoreId],
+          },
+        ],
+        input: messages,
+      });
+
+      const responseText = response.output_text?.trim() || "";
+
+      if (!responseText) {
+        console.error("[OpenAI] Empty response received from API.");
+        throw new HttpsError(
+          "internal",
+          "OpenAI returned an empty response. Please try again."
+        );
+      }
+
+      const messageId = response.id || `msg_${Date.now()}`;
+      console.log(
+        `[OpenAI] Response received successfully. Length: ${responseText.length}, Message ID: ${messageId}`
+      );
+      console.log("========== CHAT WITH COURSE COMPLETE ==========");
+
+      return {
+        response: responseText,
+        messageId: messageId,
+      };
+    } catch (error: any) {
+      console.error("========== CHAT WITH COURSE ERROR ==========");
+      console.error("[Error Message]:", error.message);
+      console.error("[Full Error]:", error);
+
+      // If it's already an HttpsError, re-throw it
+      if (error instanceof HttpsError) {
+        throw error;
+      }
+
+      const requestId =
+        error?.response?.headers?.["x-request-id"] ??
+        error?.response?.headers?.get?.("x-request-id");
+
+      if (requestId) {
+        console.error("[OpenAI Request ID]:", requestId);
+      }
+
+      throw new HttpsError(
+        "internal",
+        `Chat failed: ${error.message ?? "Unknown error"}`
+      );
+    }
+  }
+);

@@ -6,12 +6,13 @@ import '../views/role_selection_page.dart';
 import '../views/auth/sign_in_screen.dart';
 import '../views/auth/sign_up_screen.dart';
 import '../views/auth/error_screen.dart';
-import '../controllers/providers/auth_providers.dart';
-import '../views/course_detail_page.dart';
-import '../views/quiz/quiz_list_page.dart';
-import '../views/quiz/quiz_take_page.dart';
-import '../views/quiz/quiz_attempts_page.dart';
-import '../views/quiz/quiz_attempt_detail_page.dart';
+import 'controllers/providers/auth_providers.dart';
+import 'views/course_detail_page.dart';
+import 'views/quiz/quiz_list_page.dart';
+import 'views/quiz/quiz_take_page.dart';
+import 'views/quiz/quiz_attempts_page.dart';
+import 'views/quiz/quiz_attempt_detail_page.dart';
+import 'views/chat/chat_page.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authStateChangesProvider);
@@ -110,6 +111,14 @@ final routerProvider = Provider<GoRouter>((ref) {
             quizId: quizId,
             attemptId: attemptId,
           );
+        },
+      ),
+      GoRoute(
+        name: 'chat',
+        path: '/course/:courseId/chat',
+        builder: (context, state) {
+          final courseId = state.pathParameters['courseId']!;
+          return ChatPage(courseId: courseId);
         },
       ),
     ],

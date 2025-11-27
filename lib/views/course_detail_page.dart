@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../controllers/providers/auth_providers.dart';
@@ -385,6 +386,7 @@ class CourseDetailPage extends ConsumerWidget {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: const ['pdf'],
+      withData: kIsWeb, // Only read bytes on web, use file path on mobile
     );
 
     if (result == null) return;
@@ -400,7 +402,11 @@ class CourseDetailPage extends ConsumerWidget {
     try {
       await ref
           .read(courseMaterialListProvider((user.uid, courseId)).notifier)
-          .uploadAndIndex(fileName: picked.name, filePath: picked.path!);
+          .uploadAndIndex(
+            fileName: picked.name,
+            filePath: picked.path,
+            fileBytes: kIsWeb ? picked.bytes : null,
+          );
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

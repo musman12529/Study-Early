@@ -25,6 +25,7 @@ class CourseDetailPage extends ConsumerWidget {
   static const Color _brandBlue = Color(0xFF1A73E8);
   static const Color _navy = Color(0xFF101828);
   static const Color _accentRed = Color(0xFFFF6B6B);
+  static const int _maxUploadBytes = 20 * 1024 * 1024; // 20 MB limit
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -638,6 +639,16 @@ class CourseDetailPage extends ConsumerWidget {
     if (result == null) return;
 
     final picked = result.files.single;
+    if (picked.size > _maxUploadBytes) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('File too large. Maximum size is 20 MB.'),
+          ),
+        );
+      }
+      return;
+    }
 
     showDialog(
       context: context,

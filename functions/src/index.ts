@@ -1,4 +1,8 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import {
+  onDocumentUpdated,
+  onDocumentWritten,
+} from "firebase-functions/v2/firestore";
 import { defineSecret } from "firebase-functions/params";
 import * as admin from "firebase-admin";
 import OpenAI from "openai";
@@ -7,6 +11,9 @@ import * as os from "os";
 import * as fs from "fs";
 
 admin.initializeApp();
+const db = admin.firestore();
+const messaging = admin.messaging();
+const REGION = "northamerica-northeast2";
 
 const OPENAI_KEY = defineSecret("OPENAI_API_KEY");
 
@@ -125,60 +132,17 @@ export const indexMaterial = onCall(
         error?.response?.headers?.get?.("x-request-id");
       if (requestId) console.error("[OpenAI Request ID]:", requestId);
 
-      // Inline error mapping for clearer client feedback
-      const rawMessage: string =
-        error?.message ||
-        error?.response?.data?.error?.message ||
-        error?.response?.data?.message ||
-        "Unknown indexing error";
-      const status: number | undefined =
-        error?.status || error?.response?.status;
-      const lower = String(rawMessage).toLowerCase();
-      let code:
-        | "internal"
-        | "resource-exhausted"
-        | "failed-precondition"
-        | "invalid-argument"
-        | "permission-denied" = "internal";
-      let friendly = rawMessage;
-      if (lower.includes("memory limit") || lower.includes("out of memory")) {
-        code = "resource-exhausted";
-        friendly =
-          "The operation exceeded available memory. Try fewer/lighter materials or smaller PDFs and try again.";
-      } else if (status === 429 || lower.includes("rate limit")) {
-        code = "resource-exhausted";
-        friendly =
-          "The service is currently rate limited. Please wait and try again.";
-      } else if (
-        status === 413 ||
-        lower.includes("too many tokens") ||
-        lower.includes("context length")
-      ) {
-        code = "failed-precondition";
-        friendly =
-          "Your request is too large. Reduce the amount of content or split it into smaller parts.";
-      } else if (
-        status === 400 ||
-        lower.includes("invalid") ||
-        lower.includes("bad request")
-      ) {
-        code = "invalid-argument";
-        friendly =
-          "The request was invalid. Please verify your inputs and try again.";
-      } else if (status === 401 || status === 403) {
-        code = "permission-denied";
-        friendly =
-          "Permission denied when calling the AI service. Please contact support.";
-      }
-
       // Update Firestore status
       await materialRef.update({
         status: "error",
-        lastError: friendly,
+        lastError: error?.message ?? "Unknown indexing error",
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      throw new HttpsError(code, `Indexing failed: ${friendly}`);
+      throw new HttpsError(
+        "internal",
+        `Indexing failed: ${error.message ?? "Unknown error"}`
+      );
     } finally {
       // Cleanup temp file
       if (fs.existsSync(tempLocalFile)) {
@@ -822,6 +786,16 @@ Rules:
       console.log("[Firestore] Saving quiz document...");
       await quizRef.set(quizData);
 
+      await dispatchNotification({
+        userId,
+        courseId,
+        quizId,
+        type: "quizReady",
+        title: "Quiz ready",
+        body: `Quiz for "${uniqueTitle}" has been generated and is ready to attempt.`,
+        metadata: { status: "ready" },
+      });
+
       console.log("========== GENERATE QUIZ COMPLETE ==========");
       return quizData;
     } catch (error: any) {
@@ -937,22 +911,14 @@ export const chatWithCourse = onCall(
       );
     }
 
-    if (
-      !courseId ||
-      typeof courseId !== "string" ||
-      courseId.trim().length === 0
-    ) {
+    if (!courseId || typeof courseId !== "string" || courseId.trim().length === 0) {
       throw new HttpsError(
         "invalid-argument",
         "courseId must be a non-empty string."
       );
     }
 
-    if (
-      !message ||
-      typeof message !== "string" ||
-      message.trim().length === 0
-    ) {
+    if (!message || typeof message !== "string" || message.trim().length === 0) {
       throw new HttpsError(
         "invalid-argument",
         "Message must be a non-empty string."
@@ -1052,7 +1018,7 @@ Your responses should be clean, readable plain text that displays well in a chat
       if (Array.isArray(conversationHistory)) {
         const historyLimit = 10;
         const recentHistory = conversationHistory.slice(-historyLimit);
-
+        
         for (const msg of recentHistory) {
           if (
             msg &&
@@ -1064,9 +1030,8 @@ Your responses should be clean, readable plain text that displays well in a chat
             // OpenAI responses.create API requires:
             // - user messages: type "input_text"
             // - assistant messages: type "output_text"
-            const contentType =
-              msg.role === "assistant" ? "output_text" : "input_text";
-
+            const contentType = msg.role === "assistant" ? "output_text" : "input_text";
+            
             messages.push({
               role: msg.role,
               content: [
@@ -1078,7 +1043,7 @@ Your responses should be clean, readable plain text that displays well in a chat
             });
           }
         }
-
+        
         if (conversationHistory.length > historyLimit) {
           console.log(
             `[Warning] Conversation history truncated from ${conversationHistory.length} to ${historyLimit} messages.`
@@ -1162,6 +1127,282 @@ Your responses should be clean, readable plain text that displays well in a chat
         "internal",
         `Chat failed: ${error.message ?? "Unknown error"}`
       );
+    }
+  }
+);
+
+type NotificationPayload = {
+  userId: string;
+  title: string;
+  body: string;
+  type: string;
+  courseId?: string;
+  materialId?: string;
+  quizId?: string;
+  metadata?: Record<string, unknown>;
+};
+
+async function dispatchNotification(payload: NotificationPayload) {
+  const {
+    userId,
+    title,
+    body,
+    type: notificationType,
+    courseId,
+    materialId,
+    quizId,
+    metadata,
+  } = payload;
+
+  const notificationRef = await db
+    .collection("users")
+    .doc(userId)
+    .collection("notifications")
+    .add({
+      title,
+      body,
+      type: notificationType,
+      status: "unread",
+      courseId: courseId ?? null,
+      materialId: materialId ?? null,
+      quizId: quizId ?? null,
+      metadata: metadata ?? {},
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+  const notificationId = notificationRef.id;
+
+  const tokensSnap = await db
+    .collection("users")
+    .doc(userId)
+    .collection("deviceTokens")
+    .where("active", "==", true)
+    .get();
+
+  const tokens = tokensSnap.docs
+    .map((doc) => (doc.data().token as string) ?? doc.id)
+    .filter((token) => Boolean(token));
+
+  if (tokens.length === 0) {
+    console.log(
+      "[Notifications] No active tokens found for user. Stored only in Firestore.",
+      userId
+    );
+    return;
+  }
+
+  const dataPayload: Record<string, string> = {
+    type: notificationType,
+    notificationId,
+  };
+  if (courseId) dataPayload.courseId = courseId;
+  if (materialId) dataPayload.materialId = materialId;
+  if (quizId) dataPayload.quizId = quizId;
+
+  for (const chunk of chunkArray(tokens, 500)) {
+    try {
+      await messaging.sendEachForMulticast({
+        tokens: chunk,
+        notification: {
+          title,
+          body,
+        },
+        data: dataPayload,
+      });
+    } catch (error) {
+      console.error("[Notifications] Failed to send push notification", error);
+    }
+  }
+}
+
+function chunkArray<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+}
+
+export const onMaterialStatusUpdated = onDocumentUpdated(
+  {
+    region: REGION,
+    document: "users/{userId}/courses/{courseId}/materials/{materialId}",
+  },
+  async (event) => {
+    if (!event.data) return;
+
+    const before = event.data.before.data() as Record<string, any> | undefined;
+    const after = event.data.after.data() as Record<string, any> | undefined;
+
+    if (!before || !after) return;
+
+    const beforeStatus = before.status;
+    const afterStatus = after.status;
+
+    if (!afterStatus || beforeStatus === afterStatus) return;
+
+    const userId = event.params.userId as string;
+    const courseId = event.params.courseId as string;
+    const materialId = event.params.materialId as string;
+    const fileName = after.fileName ?? "Material";
+
+    if (afterStatus === "indexed") {
+      await dispatchNotification({
+        userId,
+        courseId,
+        materialId,
+        type: "materialIndexed",
+        title: "Material indexed",
+        body: `"${fileName}" is ready for chat and quiz generation.`,
+        metadata: { status: afterStatus },
+      });
+      return;
+    }
+
+    if (afterStatus === "error") {
+      const lastError = after.lastError ?? "Please retry indexing.";
+      await dispatchNotification({
+        userId,
+        courseId,
+        materialId,
+        type: "materialIndexFailed",
+        title: "Material indexing failed",
+        body: `"${fileName}" needs your attention: ${lastError}`,
+        metadata: { status: afterStatus, lastError },
+      });
+    }
+  }
+);
+
+export const onQuizStatusUpdated = onDocumentWritten(
+  {
+    region: REGION,
+    document: "users/{userId}/courses/{courseId}/quizzes/{quizId}",
+  },
+  async (event) => {
+    const before = event.data?.before?.data() as
+      | Record<string, any>
+      | undefined;
+    const after = event.data?.after?.data() as
+      | Record<string, any>
+      | undefined;
+
+    if (!after) return;
+
+    const beforeStatus = before?.status;
+    const afterStatus = after.status;
+
+    if (!afterStatus) return;
+    const hadDocumentBefore = event.data?.before?.exists ?? false;
+    if (hadDocumentBefore && beforeStatus === afterStatus) return;
+
+    const userId = event.params.userId as string;
+    const courseId = event.params.courseId as string;
+    const quizId = event.params.quizId as string;
+    const quizTitle = after.title ?? "Quiz";
+
+    if (afterStatus === "ready") {
+      if (!hadDocumentBefore) return; // creation already handled in generateQuiz
+      await dispatchNotification({
+        userId,
+        courseId,
+        quizId,
+        type: "quizReady",
+        title: "Quiz ready",
+        body: `Quiz for "${quizTitle}" has been generated and is ready to attempt.`,
+        metadata: { status: afterStatus },
+      });
+      return;
+    }
+
+    if (afterStatus === "error") {
+      const lastError = after.lastError ?? "Unknown error";
+      await dispatchNotification({
+        userId,
+        courseId,
+        quizId,
+        type: "system",
+        title: "Quiz generation failed",
+        body: `"${quizTitle}" could not be generated: ${lastError}`,
+        metadata: { status: afterStatus, lastError },
+      });
+    }
+  }
+);
+
+export const onQuizAttemptCompleted = onDocumentUpdated(
+  {
+    region: REGION,
+    document:
+      "users/{userId}/courses/{courseId}/quizzes/{quizId}/attempts/{attemptId}",
+  },
+  async (event) => {
+    if (!event.data) return;
+
+    const before = event.data.before.data() as Record<string, any> | undefined;
+    const after = event.data.after.data() as Record<string, any> | undefined;
+
+    if (!before || !after) return;
+
+    const beforeCompleted = before.completedAt;
+    const afterCompleted = after.completedAt;
+
+    if (!afterCompleted || beforeCompleted) return;
+
+    const userId = event.params.userId as string;
+    const courseId = event.params.courseId as string;
+    const quizId = event.params.quizId as string;
+    const attemptId = event.params.attemptId as string;
+
+    const numCorrect = Number(after.numCorrect ?? 0);
+    const numTotal = Number(after.numTotal ?? 0);
+    const attemptOwner = after.userId as string | undefined;
+
+    const quizSnap = await db
+      .collection("users")
+      .doc(userId)
+      .collection("courses")
+      .doc(courseId)
+      .collection("quizzes")
+      .doc(quizId)
+      .get();
+
+    const quizData = quizSnap.data() as { title?: string } | undefined;
+    const quizTitle = quizData?.title ?? "Quiz";
+
+    const percent =
+      numTotal > 0 ? Math.round((numCorrect / numTotal) * 100) : null;
+    const scoreLabel = percent
+      ? `${numCorrect}/${numTotal} (${percent}%)`
+      : `${numCorrect}/${numTotal}`;
+
+    const metadata = {
+      attemptId,
+      numCorrect,
+      numTotal,
+      studentId: attemptOwner ?? null,
+    };
+
+    await dispatchNotification({
+      userId,
+      courseId,
+      quizId,
+      type: "quizAttemptGraded",
+      title: "Quiz attempt graded",
+      body: `Attempt for "${quizTitle}" scored ${scoreLabel}.`,
+      metadata,
+    });
+
+    if (attemptOwner && attemptOwner !== userId) {
+      await dispatchNotification({
+        userId: attemptOwner,
+        courseId,
+        quizId,
+        type: "quizAttemptGraded",
+        title: `Your score: ${numCorrect}/${numTotal}`,
+        body: `"${quizTitle}" has been graded. Tap to review your answers.`,
+        metadata: { ...metadata, recipient: "student" },
+      });
     }
   }
 );

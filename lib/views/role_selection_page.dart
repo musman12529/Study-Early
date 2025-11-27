@@ -23,7 +23,10 @@ class RoleSelectionPage extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Image.asset('asset/logo.png', height: 40),
+                  Image.asset(
+                    'asset/logo.png',
+                    height: 40,
+                  ),
                   const SizedBox(width: 8),
                 ],
               ),
@@ -31,8 +34,11 @@ class RoleSelectionPage extends StatelessWidget {
               const SizedBox(height: 32),
 
               const Text(
-                'Sign in as a',
-                style: TextStyle(fontSize: 18, color: Colors.black54),
+                'Sign up as a',
+                style: TextStyle(
+                  fontSize: 18,
+                  color: Colors.black54,
+                ),
               ),
 
               const SizedBox(height: 32),
@@ -68,7 +74,10 @@ class RoleSelectionPage extends StatelessWidget {
                 children: [
                   const Text(
                     'Have an account? ',
-                    style: TextStyle(fontSize: 14, color: Colors.black54),
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.black54,
+                    ),
                   ),
                   GestureDetector(
                     onTap: () => context.go('/login'),
@@ -136,7 +145,10 @@ class _RoleButton extends StatelessWidget {
                   color: accentColor.withOpacity(0.08),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Image.asset(assetPath, height: 32),
+                child: Image.asset(
+                  assetPath,
+                  height: 32,
+                ),
               ),
               const SizedBox(width: 16),
               Expanded(

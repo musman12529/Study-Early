@@ -6,6 +6,7 @@ import '../views/role_selection_page.dart';
 import '../views/auth/sign_in_screen.dart';
 import '../views/auth/sign_up_screen.dart';
 import '../views/auth/error_screen.dart';
+import '../views/notifications/notifications_page.dart';
 import 'controllers/providers/auth_providers.dart';
 import 'views/course_detail_page.dart';
 import 'views/quiz/quiz_list_page.dart';
@@ -70,11 +71,15 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/course/:courseId',
         builder: (context, state) {
           final courseId = state.pathParameters['courseId']!;
-          final title = state.uri.queryParameters['title'] ?? courseId;
-          return CourseDetailPage(
-            courseId: courseId,
-            courseTitle: title,
-          );
+          return CourseDetailPage(courseId: courseId);
+        },
+      ),
+      GoRoute(
+        name: 'quizList',
+        path: '/course/:courseId/quizzes',
+        builder: (context, state) {
+          final courseId = state.pathParameters['courseId']!;
+          return QuizListPage(courseId: courseId);
         },
       ),
       GoRoute(
@@ -116,6 +121,11 @@ final routerProvider = Provider<GoRouter>((ref) {
           final courseId = state.pathParameters['courseId']!;
           return ChatPage(courseId: courseId);
         },
+      ),
+      GoRoute(
+        name: 'notifications',
+        path: '/notifications',
+        builder: (context, state) => const NotificationsPage(),
       ),
     ],
 

@@ -29,24 +29,21 @@ class CourseDetailPage extends ConsumerWidget {
     return authState.when(
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (err, stack) =>
-          Scaffold(body: Center(child: Text('Error: $err'))),
+      error: (err, stack) => Scaffold(body: Center(child: Text('Error: $err'))),
       data: (user) {
         if (user == null) {
-          return const Scaffold(
-            body: Center(child: Text('Not logged in')),
-          );
+          return const Scaffold(body: Center(child: Text('Not logged in')));
         }
 
-        final materials =
-            ref.watch(courseMaterialListProvider((user.uid, courseId)));
+        final materials = ref.watch(
+          courseMaterialListProvider((user.uid, courseId)),
+        );
 
         return Scaffold(
           backgroundColor: Colors.white,
           body: SafeArea(
             child: Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -61,10 +58,7 @@ class CourseDetailPage extends ConsumerWidget {
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Image.asset(
-                            'asset/logo.png',
-                            height: 24,
-                          ),
+                          Image.asset('asset/logo.png', height: 24),
                           const SizedBox(width: 6),
                         ],
                       ),
@@ -136,9 +130,7 @@ class CourseDetailPage extends ConsumerWidget {
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(18),
-                              border: Border.all(
-                                color: Colors.grey.shade300,
-                              ),
+                              border: Border.all(color: Colors.grey.shade300),
                               boxShadow: [
                                 BoxShadow(
                                   blurRadius: 10,
@@ -163,9 +155,7 @@ class CourseDetailPage extends ConsumerWidget {
                                   )
                                 : Column(
                                     children: [
-                                      for (int i = 0;
-                                          i < materials.length;
-                                          i++)
+                                      for (int i = 0; i < materials.length; i++)
                                         _MaterialRow(
                                           material: materials[i],
                                           showDivider:
@@ -174,8 +164,9 @@ class CourseDetailPage extends ConsumerWidget {
                                             final m = materials[i];
                                             if (m.status ==
                                                 MaterialStatus.indexing) {
-                                              ScaffoldMessenger.of(context)
-                                                  .showSnackBar(
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
                                                 const SnackBar(
                                                   content: Text(
                                                     'Cannot delete while indexing.',
@@ -184,18 +175,108 @@ class CourseDetailPage extends ConsumerWidget {
                                               );
                                               return;
                                             }
-                                            await ref
-                                                .read(
-                                                  courseMaterialListProvider(
-                                                    (user.uid, courseId),
-                                                  ).notifier,
-                                                )
-                                                .remove(m.id);
+                                            final choice = await showDialog<String>(
+                                              context: context,
+                                              builder: (context) {
+                                                return AlertDialog(
+                                                  title: const Text(
+                                                    'Delete material?',
+                                                  ),
+                                                  content: const Text(
+                                                    'Do you also want to delete quizzes that reference this material?',
+                                                  ),
+                                                  actions: [
+                                                    TextButton(
+                                                      onPressed: () =>
+                                                          Navigator.pop(
+                                                            context,
+                                                            'cancel',
+                                                          ),
+                                                      child: const Text(
+                                                        'Cancel',
+                                                      ),
+                                                    ),
+                                                    TextButton(
+                                                      onPressed: () =>
+                                                          Navigator.pop(
+                                                            context,
+                                                            'material',
+                                                          ),
+                                                      child: const Text(
+                                                        'Material only',
+                                                      ),
+                                                    ),
+                                                    TextButton(
+                                                      onPressed: () =>
+                                                          Navigator.pop(
+                                                            context,
+                                                            'all',
+                                                          ),
+                                                      child: const Text(
+                                                        'Material + quizzes',
+                                                        style: TextStyle(
+                                                          color: Colors.red,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                );
+                                              },
+                                            );
+
+                                            if (choice == null ||
+                                                choice == 'cancel') {
+                                              return;
+                                            }
+
+                                            final messenger =
+                                                ScaffoldMessenger.of(context);
+                                            try {
+                                              if (choice == 'material') {
+                                                await ref
+                                                    .read(
+                                                      courseMaterialListProvider(
+                                                        (user.uid, courseId),
+                                                      ).notifier,
+                                                    )
+                                                    .removeWithOption(
+                                                      materialId: m.id,
+                                                      deleteQuizzes: false,
+                                                    );
+                                              } else if (choice == 'all') {
+                                                await ref
+                                                    .read(
+                                                      courseMaterialListProvider(
+                                                        (user.uid, courseId),
+                                                      ).notifier,
+                                                    )
+                                                    .removeWithOption(
+                                                      materialId: m.id,
+                                                      deleteQuizzes: true,
+                                                    );
+                                              }
+                                              messenger.showSnackBar(
+                                                const SnackBar(
+                                                  content: Text(
+                                                    'Material deleted.',
+                                                  ),
+                                                ),
+                                              );
+                                            } catch (e) {
+                                              messenger.showSnackBar(
+                                                SnackBar(
+                                                  content: Text(
+                                                    'Failed to delete: $e',
+                                                  ),
+                                                ),
+                                              );
+                                            }
                                           },
                                           onRetryIndex: () async {
                                             final m = materials[i];
-                                            ScaffoldMessenger.of(context)
-                                                .showSnackBar(
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
                                               const SnackBar(
                                                 content: Text(
                                                   'Retrying indexing...',
@@ -205,9 +286,10 @@ class CourseDetailPage extends ConsumerWidget {
                                             );
                                             await ref
                                                 .read(
-                                                  courseMaterialListProvider(
-                                                    (user.uid, courseId),
-                                                  ).notifier,
+                                                  courseMaterialListProvider((
+                                                    user.uid,
+                                                    courseId,
+                                                  )).notifier,
                                                 )
                                                 .retry(m);
                                           },
@@ -226,8 +308,9 @@ class CourseDetailPage extends ConsumerWidget {
                                   height: 52,
                                   child: ElevatedButton(
                                     onPressed: () {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
                                         const SnackBar(
                                           content: Text(
                                             'Generate Quiz feature will be implemented later',
@@ -238,8 +321,7 @@ class CourseDetailPage extends ConsumerWidget {
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: _brandBlue,
                                       shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(12),
+                                        borderRadius: BorderRadius.circular(12),
                                       ),
                                       elevation: 0,
                                     ),
@@ -260,8 +342,9 @@ class CourseDetailPage extends ConsumerWidget {
                                   height: 52,
                                   child: ElevatedButton(
                                     onPressed: () {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
                                         const SnackBar(
                                           content: Text(
                                             'View Quizzes feature will be implemented later',
@@ -272,8 +355,7 @@ class CourseDetailPage extends ConsumerWidget {
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: _brandBlue,
                                       shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(12),
+                                        borderRadius: BorderRadius.circular(12),
                                       ),
                                       elevation: 0,
                                     ),
@@ -408,9 +490,9 @@ class CourseDetailPage extends ConsumerWidget {
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     } finally {
       Navigator.of(context).pop();
@@ -443,8 +525,7 @@ class _MaterialRowState extends State<_MaterialRow> {
     return Column(
       children: [
         Padding(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Row(
             children: [
               // PDF icon
@@ -491,12 +572,8 @@ class _MaterialRowState extends State<_MaterialRow> {
               // Toggle checkbox
               IconButton(
                 icon: Icon(
-                  _isChecked
-                      ? Icons.check_box
-                      : Icons.check_box_outline_blank,
-                  color: _isChecked
-                      ? CourseDetailPage._accentRed
-                      : Colors.grey,
+                  _isChecked ? Icons.check_box : Icons.check_box_outline_blank,
+                  color: _isChecked ? CourseDetailPage._accentRed : Colors.grey,
                 ),
                 onPressed: () {
                   setState(() {
@@ -508,11 +585,7 @@ class _MaterialRowState extends State<_MaterialRow> {
           ),
         ),
         if (widget.showDivider)
-          Divider(
-            height: 0,
-            thickness: 0.5,
-            color: Colors.grey.shade300,
-          ),
+          Divider(height: 0, thickness: 0.5, color: Colors.grey.shade300),
       ],
     );
   }

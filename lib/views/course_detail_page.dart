@@ -3,10 +3,13 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 
 import '../controllers/providers/auth_providers.dart';
 import '../controllers/providers/course_material_provider.dart';
 import '../models/course_material.dart';
+import '../controllers/providers/quiz_providers.dart';
+import 'quiz/quiz_list_page.dart';
 
 class CourseDetailPage extends ConsumerWidget {
   const CourseDetailPage({
@@ -37,6 +40,9 @@ class CourseDetailPage extends ConsumerWidget {
 
         final materials = ref.watch(
           courseMaterialListProvider((user.uid, courseId)),
+        );
+        final selectedIds = ref.watch(
+          selectedMaterialIdsProvider((user.uid, courseId)),
         );
 
         return Scaffold(
@@ -160,6 +166,9 @@ class CourseDetailPage extends ConsumerWidget {
                                           material: materials[i],
                                           showDivider:
                                               i != materials.length - 1,
+                                          isSelected: selectedIds.contains(
+                                            materials[i].id,
+                                          ),
                                           onDelete: () async {
                                             final m = materials[i];
                                             if (m.status ==
@@ -272,6 +281,22 @@ class CourseDetailPage extends ConsumerWidget {
                                               );
                                             }
                                           },
+                                          onToggleSelected: () {
+                                            final notifier = ref.read(
+                                              selectedMaterialIdsProvider((
+                                                user.uid,
+                                                courseId,
+                                              )).notifier,
+                                            );
+                                            final current = {...selectedIds};
+                                            final id = materials[i].id;
+                                            if (current.contains(id)) {
+                                              current.remove(id);
+                                            } else {
+                                              current.add(id);
+                                            }
+                                            notifier.state = current;
+                                          },
                                           onRetryIndex: () async {
                                             final m = materials[i];
                                             ScaffoldMessenger.of(
@@ -307,16 +332,165 @@ class CourseDetailPage extends ConsumerWidget {
                                 child: SizedBox(
                                   height: 52,
                                   child: ElevatedButton(
-                                    onPressed: () {
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                            'Generate Quiz feature will be implemented later',
+                                    onPressed: () async {
+                                      if (selectedIds.isEmpty) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              'Select at least one material first.',
+                                            ),
                                           ),
+                                        );
+                                        return;
+                                      }
+                                      final controller = TextEditingController(
+                                        text: '5',
+                                      );
+                                      final num = await showDialog<int>(
+                                        context: context,
+                                        builder: (context) {
+                                          String? error;
+                                          return StatefulBuilder(
+                                            builder: (context, setState) {
+                                              return AlertDialog(
+                                                title: const Text(
+                                                  'Generate quiz',
+                                                ),
+                                                content: Column(
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    TextField(
+                                                      controller: controller,
+                                                      keyboardType:
+                                                          TextInputType.number,
+                                                      inputFormatters: [
+                                                        FilteringTextInputFormatter
+                                                            .digitsOnly,
+                                                      ],
+                                                      decoration:
+                                                          const InputDecoration(
+                                                            labelText:
+                                                                'Number of questions',
+                                                          ),
+                                                    ),
+                                                    const SizedBox(height: 8),
+                                                    const Text(
+                                                      'Max 20 questions.',
+                                                      style: TextStyle(
+                                                        color: Colors.black54,
+                                                      ),
+                                                    ),
+                                                    if (error != null)
+                                                      Padding(
+                                                        padding:
+                                                            const EdgeInsets.only(
+                                                              top: 8,
+                                                            ),
+                                                        child: Text(
+                                                          error!,
+                                                          style:
+                                                              const TextStyle(
+                                                                color:
+                                                                    Colors.red,
+                                                              ),
+                                                        ),
+                                                      ),
+                                                  ],
+                                                ),
+                                                actions: [
+                                                  TextButton(
+                                                    onPressed: () =>
+                                                        Navigator.of(
+                                                          context,
+                                                        ).pop(),
+                                                    child: const Text('Cancel'),
+                                                  ),
+                                                  TextButton(
+                                                    onPressed: () {
+                                                      final parsed =
+                                                          int.tryParse(
+                                                            controller.text
+                                                                .trim(),
+                                                          );
+                                                      if (parsed == null ||
+                                                          parsed <= 0) {
+                                                        setState(() {
+                                                          error =
+                                                              'Enter a positive number (max 20).';
+                                                        });
+                                                        return;
+                                                      }
+                                                      if (parsed > 20) {
+                                                        setState(() {
+                                                          error =
+                                                              'Maximum is 20.';
+                                                        });
+                                                        return;
+                                                      }
+                                                      Navigator.of(
+                                                        context,
+                                                      ).pop(parsed);
+                                                    },
+                                                    child: const Text(
+                                                      'Generate',
+                                                    ),
+                                                  ),
+                                                ],
+                                              );
+                                            },
+                                          );
+                                        },
+                                      );
+                                      if (num == null) return;
+                                      final messenger = ScaffoldMessenger.of(
+                                        context,
+                                      );
+                                      messenger.showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Generating quiz…'),
+                                          duration: Duration(seconds: 1),
                                         ),
                                       );
+                                      try {
+                                        await ref
+                                            .read(
+                                              quizListProvider((
+                                                user.uid,
+                                                courseId,
+                                              )).notifier,
+                                            )
+                                            .generate(
+                                              materialIds: selectedIds.toList(),
+                                              numQuestions: num,
+                                            );
+                                        messenger.showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Quiz generated.'),
+                                          ),
+                                        );
+                                        if (context.mounted) {
+                                          Navigator.of(context).push(
+                                            MaterialPageRoute(
+                                              builder: (_) => QuizListPage(
+                                                courseId: courseId,
+                                              ),
+                                            ),
+                                          );
+                                        }
+                                      } catch (e) {
+                                        messenger.showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              'Failed to generate quiz: $e',
+                                            ),
+                                          ),
+                                        );
+                                      }
                                     },
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: _brandBlue,
@@ -342,13 +516,10 @@ class CourseDetailPage extends ConsumerWidget {
                                   height: 52,
                                   child: ElevatedButton(
                                     onPressed: () {
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                            'View Quizzes feature will be implemented later',
-                                          ),
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              QuizListPage(courseId: courseId),
                                         ),
                                       );
                                     },
@@ -500,25 +671,22 @@ class CourseDetailPage extends ConsumerWidget {
   }
 }
 
-class _MaterialRow extends StatefulWidget {
+class _MaterialRow extends StatelessWidget {
   const _MaterialRow({
     required this.material,
     required this.showDivider,
+    required this.isSelected,
     required this.onDelete,
+    required this.onToggleSelected,
     required this.onRetryIndex,
   });
 
   final CourseMaterial material;
   final bool showDivider;
+  final bool isSelected;
   final VoidCallback onDelete;
+  final VoidCallback onToggleSelected;
   final VoidCallback onRetryIndex;
-
-  @override
-  State<_MaterialRow> createState() => _MaterialRowState();
-}
-
-class _MaterialRowState extends State<_MaterialRow> {
-  bool _isChecked = false;
 
   @override
   Widget build(BuildContext context) {
@@ -546,7 +714,7 @@ class _MaterialRowState extends State<_MaterialRow> {
               // File name
               Expanded(
                 child: Text(
-                  widget.material.fileName,
+                  material.fileName,
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
@@ -556,35 +724,31 @@ class _MaterialRowState extends State<_MaterialRow> {
               ),
 
               // Optional retry if error
-              if (widget.material.status == MaterialStatus.error)
+              if (material.status == MaterialStatus.error)
                 IconButton(
                   tooltip: 'Retry indexing',
                   icon: const Icon(Icons.refresh),
-                  onPressed: widget.onRetryIndex,
+                  onPressed: onRetryIndex,
                 ),
 
               // Delete
               IconButton(
                 icon: const Icon(Icons.delete_outline),
-                onPressed: widget.onDelete,
+                onPressed: onDelete,
               ),
 
               // Toggle checkbox
               IconButton(
                 icon: Icon(
-                  _isChecked ? Icons.check_box : Icons.check_box_outline_blank,
-                  color: _isChecked ? CourseDetailPage._accentRed : Colors.grey,
+                  isSelected ? Icons.check_box : Icons.check_box_outline_blank,
+                  color: isSelected ? CourseDetailPage._accentRed : Colors.grey,
                 ),
-                onPressed: () {
-                  setState(() {
-                    _isChecked = !_isChecked;
-                  });
-                },
+                onPressed: onToggleSelected,
               ),
             ],
           ),
         ),
-        if (widget.showDivider)
+        if (showDivider)
           Divider(height: 0, thickness: 0.5, color: Colors.grey.shade300),
       ],
     );

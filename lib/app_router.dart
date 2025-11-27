@@ -70,15 +70,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/course/:courseId',
         builder: (context, state) {
           final courseId = state.pathParameters['courseId']!;
-          return CourseDetailPage(courseId: courseId);
-        },
-      ),
-      GoRoute(
-        name: 'quizList',
-        path: '/course/:courseId/quizzes',
-        builder: (context, state) {
-          final courseId = state.pathParameters['courseId']!;
-          return QuizListPage(courseId: courseId);
+          final title = state.uri.queryParameters['title'] ?? courseId;
+          return CourseDetailPage(
+            courseId: courseId,
+            courseTitle: title,
+          );
         },
       ),
       GoRoute(

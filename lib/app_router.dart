@@ -2,7 +2,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../views/home_page.dart';
-import '../views/auth/login_screen.dart';
+import '../views/role_selection_page.dart';
+import '../views/auth/sign_in_screen.dart';
+import '../views/auth/sign_up_screen.dart';
 import '../views/auth/error_screen.dart';
 import 'controllers/providers/auth_providers.dart';
 import 'views/course_detail_page.dart';
@@ -21,14 +23,22 @@ final routerProvider = Provider<GoRouter>((ref) {
     debugLogDiagnostics: true,
 
     redirect: (context, state) {
-      final loggingIn = state.matchedLocation == '/login';
+      if (authState.isLoading) return null;
 
-      if (user == null) {
-        return loggingIn ? null : '/login';
+      final loggedIn = user != null;
+      final goingToLogin = state.matchedLocation == '/login';
+      final goingToSignUp = state.matchedLocation == '/signup';
+      final goingToRoleSelection = state.matchedLocation == '/';
+
+      if (!loggedIn) {
+        if (goingToLogin || goingToSignUp || goingToRoleSelection) {
+          return null;
+        }
+        return '/login';
       }
 
-      if (loggingIn) {
-        return '/';
+      if (goingToLogin || goingToSignUp || goingToRoleSelection) {
+        return '/home';
       }
 
       return null;
@@ -36,14 +46,24 @@ final routerProvider = Provider<GoRouter>((ref) {
 
     routes: [
       GoRoute(
-        name: 'home',
+        name: 'roleSelection',
         path: '/',
+        builder: (context, state) => const RoleSelectionPage(),
+      ),
+      GoRoute(
+        name: 'home',
+        path: '/home',
         builder: (context, state) => const HomePage(),
       ),
       GoRoute(
         name: 'login',
         path: '/login',
-        builder: (context, state) => const LoginScreen(),
+        builder: (context, state) => const SignInScreen(),
+      ),
+      GoRoute(
+        name: 'signup',
+        path: '/signup',
+        builder: (context, state) => const SignUpScreen(),
       ),
       GoRoute(
         name: 'courseDetail',

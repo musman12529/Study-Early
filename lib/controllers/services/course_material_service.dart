@@ -12,7 +12,6 @@ class CourseMaterialService {
   CourseMaterialService(this._firestore);
 
   final FirebaseFirestore _firestore;
-  static const int _maxUploadBytes = 20 * 1024 * 1024; // 20 MB
 
   CollectionReference<Map<String, dynamic>> _materialsRef(
     String creatorId,
@@ -110,21 +109,13 @@ class CourseMaterialService {
       if (fileBytes == null) {
         throw ArgumentError('fileBytes is required for web platform');
       }
-      if (fileBytes.lengthInBytes > _maxUploadBytes) {
-        throw StateError('File too large. Maximum size is 20 MB.');
-      }
       await storageRef.putData(fileBytes, metadata);
     } else {
       // Mobile: use file path
       if (filePath == null) {
         throw ArgumentError('filePath is required for mobile platform');
       }
-      final file = File(filePath);
-      final len = await file.length();
-      if (len > _maxUploadBytes) {
-        throw StateError('File too large. Maximum size is 20 MB.');
-      }
-      await storageRef.putFile(file, metadata);
+      await storageRef.putFile(File(filePath), metadata);
     }
 
     final downloadUrl = await storageRef.getDownloadURL();

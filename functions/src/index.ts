@@ -132,60 +132,17 @@ export const indexMaterial = onCall(
         error?.response?.headers?.get?.("x-request-id");
       if (requestId) console.error("[OpenAI Request ID]:", requestId);
 
-      // Inline error mapping for clearer client feedback
-      const rawMessage: string =
-        error?.message ||
-        error?.response?.data?.error?.message ||
-        error?.response?.data?.message ||
-        "Unknown indexing error";
-      const status: number | undefined =
-        error?.status || error?.response?.status;
-      const lower = String(rawMessage).toLowerCase();
-      let code:
-        | "internal"
-        | "resource-exhausted"
-        | "failed-precondition"
-        | "invalid-argument"
-        | "permission-denied" = "internal";
-      let friendly = rawMessage;
-      if (lower.includes("memory limit") || lower.includes("out of memory")) {
-        code = "resource-exhausted";
-        friendly =
-          "The operation exceeded available memory. Try fewer/lighter materials or smaller PDFs and try again.";
-      } else if (status === 429 || lower.includes("rate limit")) {
-        code = "resource-exhausted";
-        friendly =
-          "The service is currently rate limited. Please wait and try again.";
-      } else if (
-        status === 413 ||
-        lower.includes("too many tokens") ||
-        lower.includes("context length")
-      ) {
-        code = "failed-precondition";
-        friendly =
-          "Your request is too large. Reduce the amount of content or split it into smaller parts.";
-      } else if (
-        status === 400 ||
-        lower.includes("invalid") ||
-        lower.includes("bad request")
-      ) {
-        code = "invalid-argument";
-        friendly =
-          "The request was invalid. Please verify your inputs and try again.";
-      } else if (status === 401 || status === 403) {
-        code = "permission-denied";
-        friendly =
-          "Permission denied when calling the AI service. Please contact support.";
-      }
-
       // Update Firestore status
       await materialRef.update({
         status: "error",
-        lastError: friendly,
+        lastError: error?.message ?? "Unknown indexing error",
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      throw new HttpsError(code, `Indexing failed: ${friendly}`);
+      throw new HttpsError(
+        "internal",
+        `Indexing failed: ${error.message ?? "Unknown error"}`
+      );
     } finally {
       // Cleanup temp file
       if (fs.existsSync(tempLocalFile)) {
@@ -954,22 +911,14 @@ export const chatWithCourse = onCall(
       );
     }
 
-    if (
-      !courseId ||
-      typeof courseId !== "string" ||
-      courseId.trim().length === 0
-    ) {
+    if (!courseId || typeof courseId !== "string" || courseId.trim().length === 0) {
       throw new HttpsError(
         "invalid-argument",
         "courseId must be a non-empty string."
       );
     }
 
-    if (
-      !message ||
-      typeof message !== "string" ||
-      message.trim().length === 0
-    ) {
+    if (!message || typeof message !== "string" || message.trim().length === 0) {
       throw new HttpsError(
         "invalid-argument",
         "Message must be a non-empty string."
@@ -1069,7 +1018,7 @@ Your responses should be clean, readable plain text that displays well in a chat
       if (Array.isArray(conversationHistory)) {
         const historyLimit = 10;
         const recentHistory = conversationHistory.slice(-historyLimit);
-
+        
         for (const msg of recentHistory) {
           if (
             msg &&
@@ -1081,9 +1030,8 @@ Your responses should be clean, readable plain text that displays well in a chat
             // OpenAI responses.create API requires:
             // - user messages: type "input_text"
             // - assistant messages: type "output_text"
-            const contentType =
-              msg.role === "assistant" ? "output_text" : "input_text";
-
+            const contentType = msg.role === "assistant" ? "output_text" : "input_text";
+            
             messages.push({
               role: msg.role,
               content: [
@@ -1095,7 +1043,7 @@ Your responses should be clean, readable plain text that displays well in a chat
             });
           }
         }
-
+        
         if (conversationHistory.length > historyLimit) {
           console.log(
             `[Warning] Conversation history truncated from ${conversationHistory.length} to ${historyLimit} messages.`

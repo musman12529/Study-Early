@@ -1284,19 +1284,6 @@ export const onQuizStatusUpdated = onDocumentUpdated(
     const quizId = event.params.quizId as string;
     const quizTitle = after.title ?? "Quiz";
 
-    if (afterStatus === "generating") {
-      await dispatchNotification({
-        userId,
-        courseId,
-        quizId,
-        type: "quizGenerating",
-        title: "Quiz generation started",
-        body: `"${quizTitle}" is now being auto-generated. We'll let you know when it's ready.`,
-        metadata: { status: afterStatus },
-      });
-      return;
-    }
-
     if (afterStatus === "ready") {
       await dispatchNotification({
         userId,

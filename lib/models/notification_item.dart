@@ -3,7 +3,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 enum NotificationType {
   materialIndexed,
   materialIndexFailed,
-  quizGenerating,
   quizReady,
   quizAttemptGraded,
   chatUpdate,

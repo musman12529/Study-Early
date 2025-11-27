@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -44,7 +45,43 @@ class _CourseDetailPageState extends ConsumerState<CourseDetailPage> {
         );
 
         return Scaffold(
-          appBar: AppBar(title: const Text('Course Materials')),
+          appBar: AppBar(
+            title: const Text('Course Materials'),
+            actions: [
+              IconButton(
+                icon: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    const Icon(Icons.chat_bubble_outline),
+                    Positioned(
+                      right: -4,
+                      top: -4,
+                      child: Container(
+                        width: 16,
+                        height: 16,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[800],
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                        child: const Icon(
+                          Icons.add,
+                          size: 12,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                tooltip: 'Chat with course materials',
+                onPressed: () {
+                  context.pushNamed(
+                    'chat',
+                    pathParameters: {'courseId': widget.courseId},
+                  );
+                },
+              ),
+            ],
+          ),
           body: materials.isEmpty
               ? const Center(child: Text('No materials yet'))
               : ListView.builder(
@@ -316,6 +353,7 @@ class _CourseDetailPageState extends ConsumerState<CourseDetailPage> {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: const ['pdf'],
+      withData: kIsWeb, // Only read bytes on web, use file path on mobile
     );
 
     if (result == null) return;
@@ -326,9 +364,14 @@ class _CourseDetailPageState extends ConsumerState<CourseDetailPage> {
       setState(() {
         _isUploading = true;
       });
+      
       await ref
           .read(courseMaterialListProvider((user.uid, courseId)).notifier)
-          .uploadAndIndex(fileName: picked.name, filePath: picked.path!);
+          .uploadAndIndex(
+            fileName: picked.name,
+            filePath: picked.path,
+            fileBytes: kIsWeb ? picked.bytes : null,
+          );
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

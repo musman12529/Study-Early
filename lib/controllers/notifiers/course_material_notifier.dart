@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -35,7 +36,8 @@ class CourseMaterialListNotifier
 
   Future<void> uploadAndIndex({
     required String fileName,
-    required String filePath,
+    String? filePath,
+    Uint8List? fileBytes,
   }) async {
     final creatorId = arg.$1;
     final courseId = arg.$2;
@@ -45,6 +47,7 @@ class CourseMaterialListNotifier
       courseId: courseId,
       fileName: fileName,
       filePath: filePath,
+      fileBytes: fileBytes,
     );
   }
 

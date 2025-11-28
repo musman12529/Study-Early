@@ -12,7 +12,6 @@ class QuizListPage extends ConsumerWidget {
 
   final String courseId;
 
-  static const Color _brandBlue = Color(0xFF1A73E8);
   static const Color _navy = Color(0xFF101828);
 
   Future<bool?> _confirmDelete(BuildContext context) {
@@ -53,9 +52,7 @@ class QuizListPage extends ConsumerWidget {
 
         final quizzes = ref.watch(quizListProvider((user.uid, courseId)));
 
-        // Get course title if we have it, otherwise just show "Quizzes"
         final courses = ref.watch(courseListProvider(user.uid));
-        // Get course title if we have it, otherwise just show "Quizzes"
         String courseTitle;
         if (courses.isEmpty) {
           courseTitle = 'Quizzes';
@@ -94,7 +91,7 @@ class QuizListPage extends ConsumerWidget {
                           const SizedBox(width: 6),
                         ],
                       ),
-                      const SizedBox(width: 48), // spacer to balance layout
+                      const SizedBox(width: 48), 
                     ],
                   ),
 

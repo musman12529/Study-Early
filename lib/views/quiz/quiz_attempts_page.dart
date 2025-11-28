@@ -69,7 +69,7 @@ class QuizAttemptsPage extends ConsumerWidget {
                           const SizedBox(width: 6),
                         ],
                       ),
-                      const SizedBox(width: 48), // spacer
+                      const SizedBox(width: 48),
                     ],
                   ),
 

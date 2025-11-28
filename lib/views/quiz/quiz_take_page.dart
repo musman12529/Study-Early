@@ -25,6 +25,8 @@ class QuizTakePage extends ConsumerStatefulWidget {
 class _QuizTakePageState extends ConsumerState<QuizTakePage> {
   static const Color _navy = Color(0xFF101828);
   static const Color _accentRed = Color(0xFFFF6B6B);
+  static const Color _brandBlue = Color(0xFF1A73E8);
+
 
 
   int _index = 0;
@@ -192,7 +194,7 @@ class _QuizTakePageState extends ConsumerState<QuizTakePage> {
                                   }
                                 : null,
                             style: OutlinedButton.styleFrom(
-                              side: const BorderSide(color: _accentRed),
+                              side: const BorderSide(color: _brandBlue),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
@@ -200,7 +202,7 @@ class _QuizTakePageState extends ConsumerState<QuizTakePage> {
                             child: const Text(
                               'Previous',
                               style: TextStyle(
-                                color: _accentRed,
+                                color: _brandBlue,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -216,7 +218,7 @@ class _QuizTakePageState extends ConsumerState<QuizTakePage> {
                                     });
                                   },
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: _accentRed,
+                                    backgroundColor: _brandBlue,
                                     shape: RoundedRectangleBorder(
                                       borderRadius:
                                           BorderRadius.circular(12),
@@ -274,7 +276,7 @@ class _QuizTakePageState extends ConsumerState<QuizTakePage> {
                                         );
                                   },
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: _accentRed,
+                                    backgroundColor: _brandBlue,
                                     shape: RoundedRectangleBorder(
                                       borderRadius:
                                           BorderRadius.circular(12),
@@ -325,7 +327,7 @@ class _Header extends StatelessWidget {
             const SizedBox(width: 6),
           ],
         ),
-        const SizedBox(width: 48), // spacer to balance layout
+        const SizedBox(width: 48), 
       ],
     );
   }

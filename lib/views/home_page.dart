@@ -38,7 +38,6 @@ class HomePage extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Top bar: logo + bell + logout
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -283,7 +282,7 @@ class HomePage extends ConsumerWidget {
                         }
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: _accentRed,
+                        backgroundColor: _brandBlue,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
                         ),

@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -41,8 +42,7 @@ class _CourseDetailPageState extends ConsumerState<CourseDetailPage> {
     return authState.when(
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (err, stack) =>
-          Scaffold(body: Center(child: Text('Error: $err'))),
+      error: (err, stack) => Scaffold(body: Center(child: Text('Error: $err'))),
       data: (user) {
         if (user == null) {
           return const Scaffold(body: Center(child: Text('Not logged in')));
@@ -63,8 +63,7 @@ class _CourseDetailPageState extends ConsumerState<CourseDetailPage> {
           backgroundColor: Colors.white,
           body: SafeArea(
             child: Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -79,10 +78,7 @@ class _CourseDetailPageState extends ConsumerState<CourseDetailPage> {
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Image.asset(
-                            'asset/logo.png',
-                            height: 26,
-                          ),
+                          Image.asset('asset/logo.png', height: 26),
                           const SizedBox(width: 6),
                         ],
                       ),
@@ -150,9 +146,7 @@ class _CourseDetailPageState extends ConsumerState<CourseDetailPage> {
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(18),
-                              border: Border.all(
-                                color: Colors.grey.shade300,
-                              ),
+                              border: Border.all(color: Colors.grey.shade300),
                               boxShadow: [
                                 BoxShadow(
                                   blurRadius: 10,
@@ -177,15 +171,12 @@ class _CourseDetailPageState extends ConsumerState<CourseDetailPage> {
                                   )
                                 : Column(
                                     children: [
-                                      for (int i = 0;
-                                          i < materials.length;
-                                          i++)
+                                      for (int i = 0; i < materials.length; i++)
                                         _buildMaterialRow(
                                           context,
                                           user.uid,
                                           materials[i],
-                                          isLast:
-                                              i == materials.length - 1,
+                                          isLast: i == materials.length - 1,
                                         ),
                                     ],
                                   ),
@@ -200,21 +191,27 @@ class _CourseDetailPageState extends ConsumerState<CourseDetailPage> {
                                 child: SizedBox(
                                   height: 52,
                                   child: ElevatedButton(
-                                    onPressed: _selectedMaterialIds.isEmpty ||
+                                    onPressed:
+                                        _selectedMaterialIds.isEmpty ||
                                             _isGenerating
                                         ? null
                                         : () async {
+                                            final numQuestions =
+                                                await _promptNumQuestions(
+                                                  context,
+                                                );
+                                            if (numQuestions == null) return;
                                             await _generateQuiz(
                                               context,
                                               ref,
                                               user.uid,
+                                              numQuestions,
                                             );
                                           },
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: _brandBlue,
                                       shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(12),
+                                        borderRadius: BorderRadius.circular(12),
                                       ),
                                       elevation: 0,
                                     ),
@@ -222,12 +219,12 @@ class _CourseDetailPageState extends ConsumerState<CourseDetailPage> {
                                         ? const SizedBox(
                                             width: 20,
                                             height: 20,
-                                            child:
-                                                CircularProgressIndicator(
+                                            child: CircularProgressIndicator(
                                               strokeWidth: 2,
                                               valueColor:
-                                                  AlwaysStoppedAnimation<
-                                                      Color>(Colors.white),
+                                                  AlwaysStoppedAnimation<Color>(
+                                                    Colors.white,
+                                                  ),
                                             ),
                                           )
                                         : const Text(
@@ -257,8 +254,7 @@ class _CourseDetailPageState extends ConsumerState<CourseDetailPage> {
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: _brandBlue,
                                       shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(12),
+                                        borderRadius: BorderRadius.circular(12),
                                       ),
                                       elevation: 0,
                                     ),
@@ -286,9 +282,7 @@ class _CourseDetailPageState extends ConsumerState<CourseDetailPage> {
                               onPressed: () {
                                 context.pushNamed(
                                   'chat',
-                                  pathParameters: {
-                                    'courseId': widget.courseId,
-                                  },
+                                  pathParameters: {'courseId': widget.courseId},
                                 );
                               },
                               style: OutlinedButton.styleFrom(
@@ -335,8 +329,7 @@ class _CourseDetailPageState extends ConsumerState<CourseDetailPage> {
     return Column(
       children: [
         Padding(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Row(
             children: [
               // PDF badge
@@ -384,8 +377,10 @@ class _CourseDetailPageState extends ConsumerState<CourseDetailPage> {
                     );
                     await ref
                         .read(
-                          courseMaterialListProvider((userId, widget.courseId))
-                              .notifier,
+                          courseMaterialListProvider((
+                            userId,
+                            widget.courseId,
+                          )).notifier,
                         )
                         .retry(m);
                   },
@@ -404,15 +399,13 @@ class _CourseDetailPageState extends ConsumerState<CourseDetailPage> {
                         if (m.status == MaterialStatus.indexing) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content:
-                                  Text('Cannot delete while indexing.'),
+                              content: Text('Cannot delete while indexing.'),
                             ),
                           );
                           return;
                         }
 
-                        final choice =
-                            await showDialog<_DeleteMaterialChoice>(
+                        final choice = await showDialog<_DeleteMaterialChoice>(
                           context: context,
                           builder: (context) {
                             return AlertDialog(
@@ -422,25 +415,21 @@ class _CourseDetailPageState extends ConsumerState<CourseDetailPage> {
                               ),
                               actions: [
                                 TextButton(
-                                  onPressed: () =>
-                                      Navigator.pop(context, null),
+                                  onPressed: () => Navigator.pop(context, null),
                                   child: const Text('Cancel'),
                                 ),
                                 TextButton(
-                                  onPressed: () =>
-                                      Navigator.pop(
-                                        context,
-                                        _DeleteMaterialChoice.materialOnly,
-                                      ),
+                                  onPressed: () => Navigator.pop(
+                                    context,
+                                    _DeleteMaterialChoice.materialOnly,
+                                  ),
                                   child: const Text('Material only'),
                                 ),
                                 TextButton(
-                                  onPressed: () =>
-                                      Navigator.pop(
-                                        context,
-                                        _DeleteMaterialChoice
-                                            .materialAndQuizzes,
-                                      ),
+                                  onPressed: () => Navigator.pop(
+                                    context,
+                                    _DeleteMaterialChoice.materialAndQuizzes,
+                                  ),
                                   child: const Text(
                                     'Material + quizzes',
                                     style: TextStyle(color: Colors.red),
@@ -454,8 +443,7 @@ class _CourseDetailPageState extends ConsumerState<CourseDetailPage> {
                         if (choice == null) return;
 
                         final deleteQuizzes =
-                            choice ==
-                                _DeleteMaterialChoice.materialAndQuizzes;
+                            choice == _DeleteMaterialChoice.materialAndQuizzes;
 
                         setState(() {
                           _deletingMaterialIds.add(m.id);
@@ -464,9 +452,10 @@ class _CourseDetailPageState extends ConsumerState<CourseDetailPage> {
                         try {
                           await ref
                               .read(
-                                courseMaterialListProvider(
-                                  (userId, widget.courseId),
-                                ).notifier,
+                                courseMaterialListProvider((
+                                  userId,
+                                  widget.courseId,
+                                )).notifier,
                               )
                               .removeWithOption(
                                 materialId: m.id,
@@ -486,9 +475,7 @@ class _CourseDetailPageState extends ConsumerState<CourseDetailPage> {
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text(
-                                  'Failed to delete material: $e',
-                                ),
+                                content: Text('Failed to delete material: $e'),
                               ),
                             );
                           }
@@ -505,9 +492,7 @@ class _CourseDetailPageState extends ConsumerState<CourseDetailPage> {
               // Selection toggle (pink checkbox-like)
               IconButton(
                 icon: Icon(
-                  isSelected
-                      ? Icons.check_box
-                      : Icons.check_box_outline_blank,
+                  isSelected ? Icons.check_box : Icons.check_box_outline_blank,
                   color: isSelected ? _accentRed : Colors.grey,
                 ),
                 onPressed: m.status == MaterialStatus.indexed
@@ -526,11 +511,7 @@ class _CourseDetailPageState extends ConsumerState<CourseDetailPage> {
           ),
         ),
         if (!isLast)
-          Divider(
-            height: 0,
-            thickness: 0.5,
-            color: Colors.grey.shade300,
-          ),
+          Divider(height: 0, thickness: 0.5, color: Colors.grey.shade300),
       ],
     );
   }
@@ -571,9 +552,9 @@ class _CourseDetailPageState extends ConsumerState<CourseDetailPage> {
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     } finally {
       if (mounted) {
@@ -584,10 +565,78 @@ class _CourseDetailPageState extends ConsumerState<CourseDetailPage> {
     }
   }
 
+  Future<int?> _promptNumQuestions(BuildContext context) async {
+    final controller = TextEditingController(text: '5');
+    int? parsed = 5;
+    String? errorText;
+    return showDialog<int>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Number of questions'),
+              content: SizedBox(
+                width: 300,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: controller,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      decoration: InputDecoration(
+                        hintText: 'Enter a number from 1 to 20',
+                        errorText: errorText,
+                      ),
+                      onChanged: (value) {
+                        final n = int.tryParse(value);
+                        setState(() {
+                          if (n == null || n < 1 || n > 20) {
+                            errorText = 'Enter a number from 1 to 20';
+                            parsed = null;
+                          } else {
+                            errorText = null;
+                            parsed = n;
+                          }
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    const Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Max 20 questions',
+                        style: TextStyle(fontSize: 12, color: Colors.black54),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, null),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: parsed == null
+                      ? null
+                      : () => Navigator.pop(context, parsed),
+                  child: const Text('Generate'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<void> _generateQuiz(
     BuildContext context,
     WidgetRef ref,
     String creatorId,
+    int numQuestions,
   ) async {
     if (_selectedMaterialIds.isEmpty) return;
     try {
@@ -595,27 +644,26 @@ class _CourseDetailPageState extends ConsumerState<CourseDetailPage> {
         _isGenerating = true;
       });
 
-      final quizId = await ref
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Quiz generation started. It will appear in View Quizzes once ready.',
+            ),
+          ),
+        );
+      }
+
+      await ref
           .read(quizListProvider((creatorId, widget.courseId)).notifier)
           .generate(
             materialIds: _selectedMaterialIds.toList(),
-            numQuestions: 10,
+            numQuestions: numQuestions.clamp(1, 20),
           );
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Quiz generated: $quizId')),
-        );
-      }
       setState(() {
         _selectedMaterialIds.clear();
       });
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to generate quiz: $e')),
-        );
-      }
     } finally {
       if (mounted) {
         setState(() {

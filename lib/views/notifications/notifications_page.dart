@@ -9,6 +9,9 @@ import '../../models/notification_item.dart';
 class NotificationsPage extends ConsumerWidget {
   const NotificationsPage({super.key});
 
+  static const Color _navy = Color(0xFF101828);
+  static const Color _brandBlue = Color(0xFF1A73E8);
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authStateChangesProvider);
@@ -26,42 +29,89 @@ class NotificationsPage extends ConsumerWidget {
             body: Center(child: Text('Sign in to view notifications.')),
           );
         }
+
         final state = ref.watch(notificationListProvider(user.uid));
         final notifier =
             ref.read(notificationListProvider(user.uid).notifier);
 
         return Scaffold(
-          appBar: AppBar(
-            title: const Text('Notifications'),
-            actions: [
-              IconButton(
-                tooltip: 'Mark all read',
-                onPressed:
-                    state.unreadCount == 0 ? null : notifier.markAllAsRead,
-                icon: const Icon(Icons.done_all_outlined),
-              ),
-            ],
-          ),
-          body: state.isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : state.error != null
-                  ? _ErrorNotice(error: state.error!)
-                  : state.notifications.isEmpty
-                      ? const _EmptyNotifications()
-                      : ListView.separated(
-                      padding: const EdgeInsets.all(12),
-                      itemCount: state.notifications.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 8),
-                      itemBuilder: (context, index) {
-                        final notification = state.notifications[index];
-                        return _NotificationTile(
-                          notification: notification,
-                          markAsRead: () => notifier.markAsRead(
-                            notification.id,
+          backgroundColor: Colors.white,
+          body: SafeArea(
+            child: Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // HEADER: back + StudyEarly logo + "mark all read"
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back),
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Image.asset(
+                            'asset/logo.png',
+                            height: 26,
                           ),
-                        );
-                      },
+                          const SizedBox(width: 6),
+                        ],
+                      ),
+                      IconButton(
+                        tooltip: 'Mark all read',
+                        onPressed: state.unreadCount == 0
+                            ? null
+                            : notifier.markAllAsRead,
+                        icon: const Icon(Icons.done_all_outlined),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  const Text(
+                    'Notifications',
+                    style: TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w700,
+                      color: _navy,
                     ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  Expanded(
+                    child: state.isLoading
+                        ? const Center(child: CircularProgressIndicator())
+                        : state.error != null
+                            ? _ErrorNotice(error: state.error!)
+                            : state.notifications.isEmpty
+                                ? const _EmptyNotifications()
+                                : ListView.separated(
+                                    padding: EdgeInsets.zero,
+                                    itemCount: state.notifications.length,
+                                    separatorBuilder: (_, __) =>
+                                        const SizedBox(height: 12),
+                                    itemBuilder: (context, index) {
+                                      final notification =
+                                          state.notifications[index];
+                                      return _NotificationTile(
+                                        notification: notification,
+                                        markAsRead: () => notifier.markAsRead(
+                                          notification.id,
+                                        ),
+                                      );
+                                    },
+                                  ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         );
       },
     );
@@ -80,25 +130,40 @@ class _NotificationTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
     final titleStyle = notification.isUnread
         ? theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.w600,
           )
         : theme.textTheme.titleMedium;
 
+    final bool unread = notification.isUnread;
+
     return Material(
-      color: notification.isUnread
-          ? theme.colorScheme.primaryContainer.withOpacity(0.15)
-          : theme.colorScheme.surface,
-      borderRadius: BorderRadius.circular(12),
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(18),
       child: InkWell(
         onTap: () {
           markAsRead();
           _handleNavigation(context, notification);
         },
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
           padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: unread
+                ? theme.colorScheme.primaryContainer.withOpacity(0.18)
+                : Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: Colors.grey.shade300),
+            boxShadow: [
+              BoxShadow(
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+                color: Colors.black.withOpacity(0.03),
+              ),
+            ],
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -106,7 +171,7 @@ class _NotificationTile extends StatelessWidget {
                 children: [
                   Icon(
                     _iconForType(notification.type),
-                    color: notification.isUnread
+                    color: unread
                         ? theme.colorScheme.primary
                         : theme.colorScheme.onSurfaceVariant,
                   ),
@@ -211,9 +276,15 @@ class _EmptyNotifications extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: const [
-          Icon(Icons.notifications_none, size: 64),
+          Icon(Icons.notifications_none, size: 64, color: Colors.grey),
           SizedBox(height: 12),
-          Text('You are all caught up!'),
+          Text(
+            'You are all caught up!',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.black54,
+            ),
+          ),
         ],
       ),
     );
@@ -233,7 +304,7 @@ class _ErrorNotice extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline, size: 48),
+            const Icon(Icons.error_outline, size: 48, color: Colors.red),
             const SizedBox(height: 12),
             Text(
               'Failed to load notifications',
@@ -251,4 +322,3 @@ class _ErrorNotice extends StatelessWidget {
     );
   }
 }
-

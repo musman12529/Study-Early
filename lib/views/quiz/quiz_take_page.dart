@@ -9,7 +9,11 @@ import '../../models/quiz/quiz_answer.dart';
 import '../../models/quiz/quiz_attempt.dart';
 
 class QuizTakePage extends ConsumerStatefulWidget {
-  const QuizTakePage({super.key, required this.courseId, required this.quizId});
+  const QuizTakePage({
+    super.key,
+    required this.courseId,
+    required this.quizId,
+  });
 
   final String courseId;
   final String quizId;
@@ -19,6 +23,12 @@ class QuizTakePage extends ConsumerStatefulWidget {
 }
 
 class _QuizTakePageState extends ConsumerState<QuizTakePage> {
+  static const Color _navy = Color(0xFF101828);
+  static const Color _accentRed = Color(0xFFFF6B6B);
+  static const Color _brandBlue = Color(0xFF1A73E8);
+
+
+
   int _index = 0;
   final Map<String, Set<String>> _selections = {};
   String? _submittedAttemptId;
@@ -26,18 +36,21 @@ class _QuizTakePageState extends ConsumerState<QuizTakePage> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authStateChangesProvider);
+
     return authState.when(
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (err, _) => Scaffold(body: Center(child: Text('Error: $err'))),
+      error: (err, _) =>
+          Scaffold(body: Center(child: Text('Error: $err'))),
       data: (user) {
         if (user == null) {
-          return const Scaffold(body: Center(child: Text('Not logged in')));
+          return const Scaffold(
+            body: Center(child: Text('Not logged in')),
+          );
         }
 
-        final quizzes = ref.watch(
-          quizListProvider((user.uid, widget.courseId)),
-        );
+        final quizzes =
+            ref.watch(quizListProvider((user.uid, widget.courseId)));
         final quiz = quizzes.firstWhere(
           (q) => q.id == widget.quizId,
           orElse: () => Quiz(
@@ -59,11 +72,45 @@ class _QuizTakePageState extends ConsumerState<QuizTakePage> {
             ? null
             : attempts.where((a) => a.id == _submittedAttemptId).firstOrNull;
 
+        // Not ready state
         if (quiz.questions.isEmpty || quiz.status != QuizStatus.ready) {
           return Scaffold(
-            appBar: AppBar(title: const Text('Take Quiz')),
-            body: const Center(
-              child: Text('Quiz is not ready yet. Please try again later.'),
+            backgroundColor: Colors.white,
+            body: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 16,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _Header(onBack: () => context.pop()),
+                    const SizedBox(height: 24),
+                    const Text(
+                      'Take Quiz',
+                      style: TextStyle(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w700,
+                        color: _navy,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Expanded(
+                      child: Center(
+                        child: Text(
+                          'Quiz is not ready yet.\nPlease try again later.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.black54,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           );
         }
@@ -72,32 +119,69 @@ class _QuizTakePageState extends ConsumerState<QuizTakePage> {
           _index = quiz.questions.length - 1;
         }
 
+        final showingResults = submittedAttempt != null;
+
         return Scaffold(
-          appBar: AppBar(
-            title: const Text('Take Quiz'),
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: () => context.pop(),
+          backgroundColor: Colors.white,
+          body: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 16,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _Header(onBack: () => context.pop()),
+                  const SizedBox(height: 24),
+                  Text(
+                    showingResults ? 'Results' : 'Take Quiz',
+                    style: const TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w700,
+                      color: _navy,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  if (!showingResults)
+                    Text(
+                      'Question ${_index + 1} of ${quiz.questions.length}',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Colors.black54,
+                      ),
+                    ),
+                  const SizedBox(height: 16),
+                  Expanded(
+                    child: showingResults
+                        ? _ResultView(
+                            quiz: quiz,
+                            attempt: submittedAttempt!,
+                          )
+                        : _QuestionView(
+                            questionIndex: _index,
+                            total: quiz.questions.length,
+                            quiz: quiz,
+                            selections: _selections,
+                            onChanged: (qid, choiceIds) {
+                              setState(() {
+                                _selections[qid] = choiceIds;
+                              });
+                            },
+                          ),
+                  ),
+                ],
+              ),
             ),
           ),
-          body: submittedAttempt != null
-              ? _ResultView(quiz: quiz, attempt: submittedAttempt)
-              : _QuestionView(
-                  questionIndex: _index,
-                  total: quiz.questions.length,
-                  quiz: quiz,
-                  selections: _selections,
-                  onChanged: (qid, choiceIds) {
-                    setState(() {
-                      _selections[qid] = choiceIds;
-                    });
-                  },
-                ),
-          bottomNavigationBar: submittedAttempt != null
+
+          // Bottom nav buttons
+          bottomNavigationBar: showingResults
               ? null
               : SafeArea(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                    padding:
+                        const EdgeInsets.fromLTRB(16, 8, 16, 16),
                     child: Row(
                       children: [
                         Expanded(
@@ -109,7 +193,19 @@ class _QuizTakePageState extends ConsumerState<QuizTakePage> {
                                     });
                                   }
                                 : null,
-                            child: const Text('Previous'),
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: _brandBlue),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: const Text(
+                              'Previous',
+                              style: TextStyle(
+                                color: _brandBlue,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -121,12 +217,27 @@ class _QuizTakePageState extends ConsumerState<QuizTakePage> {
                                       _index += 1;
                                     });
                                   },
-                                  child: const Text('Next'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: _brandBlue,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius:
+                                          BorderRadius.circular(12),
+                                    ),
+                                    elevation: 0,
+                                  ),
+                                  child: const Text(
+                                    'Next',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
                                 )
                               : ElevatedButton.icon(
                                   icon: const Icon(Icons.check),
                                   onPressed: () async {
-                                    final answers = quiz.questions.map((q) {
+                                    final answers =
+                                        quiz.questions.map((q) {
                                       final selected =
                                           _selections[q.id]?.toList() ??
                                           const <String>[];
@@ -145,9 +256,11 @@ class _QuizTakePageState extends ConsumerState<QuizTakePage> {
                                           )).notifier,
                                         )
                                         .startAttempt(userId: user.uid);
+
                                     setState(() {
                                       _submittedAttemptId = attempt.id;
                                     });
+
                                     await ref
                                         .read(
                                           quizAttemptsProvider((
@@ -162,7 +275,20 @@ class _QuizTakePageState extends ConsumerState<QuizTakePage> {
                                           answers: answers,
                                         );
                                   },
-                                  label: const Text('Submit'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: _brandBlue,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius:
+                                          BorderRadius.circular(12),
+                                    ),
+                                    elevation: 0,
+                                  ),
+                                  label: const Text(
+                                    'Submit',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
                                 ),
                         ),
                       ],
@@ -175,7 +301,41 @@ class _QuizTakePageState extends ConsumerState<QuizTakePage> {
   }
 }
 
+// Shared header used on this page
+class _Header extends StatelessWidget {
+  const _Header({required this.onBack});
+
+  final VoidCallback onBack;
+  static const Color _navy = Color(0xFF101828);
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: onBack,
+        ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Image.asset(
+              'asset/logo.png',
+              height: 26,
+            ),
+            const SizedBox(width: 6),
+          ],
+        ),
+        const SizedBox(width: 48), 
+      ],
+    );
+  }
+}
+
 class _QuestionView extends StatelessWidget {
+  static const Color _navy = Color(0xFF101828);
+
   const _QuestionView({
     required this.questionIndex,
     required this.total,
@@ -189,7 +349,7 @@ class _QuestionView extends StatelessWidget {
   final Quiz quiz;
   final Map<String, Set<String>> selections;
   final void Function(String questionId, Set<String> selectedOptionIds)
-  onChanged;
+      onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -197,48 +357,79 @@ class _QuestionView extends StatelessWidget {
     final selected = selections[q.id] ?? <String>{};
     final multiple = q.multipleCorrectAllowed;
 
-    return Padding(
+    return Container(
       padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.grey.shade300),
+        boxShadow: [
+          BoxShadow(
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+            color: Colors.black.withOpacity(0.03),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Question ${questionIndex + 1} of $total',
-            style: Theme.of(context).textTheme.titleMedium,
+            q.prompt,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: _navy,
+            ),
           ),
-          const SizedBox(height: 8),
-          Text(q.prompt, style: Theme.of(context).textTheme.titleLarge),
+          if (multiple) ...[
+            const SizedBox(height: 4),
+            const Text(
+              'Select all that apply',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.black54,
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
           Expanded(
             child: ListView.builder(
               itemCount: q.options.length,
               itemBuilder: (context, idx) {
                 final opt = q.options[idx];
+
                 if (multiple) {
                   final checked = selected.contains(opt.id);
-                  return CheckboxListTile(
-                    value: checked,
-                    onChanged: (v) {
-                      final next = Set<String>.from(selected);
-                      if (v == true) {
-                        next.add(opt.id);
-                      } else {
-                        next.remove(opt.id);
-                      }
-                      onChanged(q.id, next);
-                    },
-                    title: Text(opt.text),
+                  return Card(
+                    margin: const EdgeInsets.symmetric(vertical: 4),
+                    child: CheckboxListTile(
+                      value: checked,
+                      onChanged: (v) {
+                        final next = Set<String>.from(selected);
+                        if (v == true) {
+                          next.add(opt.id);
+                        } else {
+                          next.remove(opt.id);
+                        }
+                        onChanged(q.id, next);
+                      },
+                      title: Text(opt.text),
+                    ),
                   );
                 } else {
-                  // only one selection
-                  final groupValue = selected.isEmpty ? null : selected.first;
-                  return RadioListTile<String>(
-                    value: opt.id,
-                    groupValue: groupValue,
-                    onChanged: (v) {
-                      onChanged(q.id, {opt.id});
-                    },
-                    title: Text(opt.text),
+                  final groupValue =
+                      selected.isEmpty ? null : selected.first;
+                  return Card(
+                    margin: const EdgeInsets.symmetric(vertical: 4),
+                    child: RadioListTile<String>(
+                      value: opt.id,
+                      groupValue: groupValue,
+                      onChanged: (v) {
+                        onChanged(q.id, {opt.id});
+                      },
+                      title: Text(opt.text),
+                    ),
                   );
                 }
               },
@@ -252,6 +443,7 @@ class _QuestionView extends StatelessWidget {
 
 class _ResultView extends StatelessWidget {
   const _ResultView({required this.quiz, required this.attempt});
+  static const Color _navy = Color(0xFF101828);
 
   final Quiz quiz;
   final QuizAttempt attempt;
@@ -261,99 +453,127 @@ class _ResultView extends StatelessWidget {
     final percent = attempt.numTotal == 0
         ? 0
         : ((attempt.numCorrect / attempt.numTotal) * 100).round();
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Results', style: Theme.of(context).textTheme.headlineSmall),
-          const SizedBox(height: 8),
-          Text('Score: ${attempt.numCorrect}/${attempt.numTotal} ($percent%)'),
-          const SizedBox(height: 16),
-          Expanded(
-            child: ListView.builder(
-              itemCount: quiz.questions.length,
-              itemBuilder: (context, idx) {
-                final q = quiz.questions[idx];
-                final ans = attempt.answers.firstWhere(
-                  (a) => a.questionId == q.id,
-                  orElse: () {
-                    return QuizAnswer(
-                      questionId: q.id,
-                      selectedOptionIds: const [],
-                    );
-                  },
-                );
-                final isCorrect = ans.isCorrect;
-                return Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              isCorrect ? Icons.check_circle : Icons.cancel,
-                              color: isCorrect ? Colors.green : Colors.red,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                q.prompt,
-                                style: Theme.of(context).textTheme.titleMedium,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        ...q.options.map((o) {
-                          final chosen = ans.selectedOptionIds.contains(o.id);
-                          final correct = o.isCorrect;
-                          Color? color;
-                          if (chosen && correct) color = Colors.green[100];
-                          if (chosen && !correct) color = Colors.red[100];
-                          return Container(
-                            width: double.infinity,
-                            margin: const EdgeInsets.symmetric(vertical: 2),
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: color,
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
-                                color: correct
-                                    ? Colors.green
-                                    : Colors.grey.withOpacity(0.3),
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                if (correct)
-                                  const Icon(Icons.check, color: Colors.green),
-                                if (!correct) const SizedBox(width: 0),
-                                const SizedBox(width: 6),
-                                Expanded(child: Text(o.text)),
-                              ],
-                            ),
-                          );
-                        }),
-                        if (q.explanation != null && q.explanation!.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 8),
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Score: ${attempt.numCorrect}/${attempt.numTotal} ($percent%)',
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: _navy,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Expanded(
+          child: ListView.builder(
+            itemCount: quiz.questions.length,
+            itemBuilder: (context, idx) {
+              final q = quiz.questions[idx];
+              final ans = attempt.answers.firstWhere(
+                (a) => a.questionId == q.id,
+                orElse: () {
+                  return QuizAnswer(
+                    questionId: q.id,
+                    selectedOptionIds: const [],
+                  );
+                },
+              );
+              final isCorrect = ans.isCorrect;
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: Colors.grey.shade300),
+                  boxShadow: [
+                    BoxShadow(
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                      color: Colors.black.withOpacity(0.03),
+                    ),
+                  ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            isCorrect
+                                ? Icons.check_circle
+                                : Icons.cancel,
+                            color: isCorrect ? Colors.green : Colors.red,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
                             child: Text(
-                              'Explanation: ${q.explanation}',
-                              style: Theme.of(context).textTheme.bodySmall,
+                              q.prompt,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: _navy,
+                              ),
                             ),
                           ),
-                      ],
-                    ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      ...q.options.map((o) {
+                        final chosen =
+                            ans.selectedOptionIds.contains(o.id);
+                        final correct = o.isCorrect;
+
+                        Color? bgColor;
+                        if (chosen && correct) bgColor = Colors.green[50];
+                        if (chosen && !correct) bgColor = Colors.red[50];
+
+                        return Container(
+                          width: double.infinity,
+                          margin: const EdgeInsets.symmetric(vertical: 2),
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: bgColor,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: correct
+                                  ? Colors.green
+                                  : Colors.grey.withOpacity(0.3),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              if (correct)
+                                const Icon(Icons.check,
+                                    color: Colors.green),
+                              if (!correct) const SizedBox(width: 0),
+                              const SizedBox(width: 6),
+                              Expanded(child: Text(o.text)),
+                            ],
+                          ),
+                        );
+                      }),
+                      if (q.explanation != null &&
+                          q.explanation!.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            'Explanation: ${q.explanation}',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ),
+                    ],
                   ),
-                );
-              },
-            ),
+                ),
+              );
+            },
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

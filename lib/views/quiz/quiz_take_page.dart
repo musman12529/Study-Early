@@ -9,11 +9,7 @@ import '../../models/quiz/quiz_answer.dart';
 import '../../models/quiz/quiz_attempt.dart';
 
 class QuizTakePage extends ConsumerStatefulWidget {
-  const QuizTakePage({
-    super.key,
-    required this.courseId,
-    required this.quizId,
-  });
+  const QuizTakePage({super.key, required this.courseId, required this.quizId});
 
   final String courseId;
   final String quizId;
@@ -27,8 +23,6 @@ class _QuizTakePageState extends ConsumerState<QuizTakePage> {
   static const Color _accentRed = Color(0xFFFF6B6B);
   static const Color _brandBlue = Color(0xFF1A73E8);
 
-
-
   int _index = 0;
   final Map<String, Set<String>> _selections = {};
   String? _submittedAttemptId;
@@ -40,17 +34,15 @@ class _QuizTakePageState extends ConsumerState<QuizTakePage> {
     return authState.when(
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (err, _) =>
-          Scaffold(body: Center(child: Text('Error: $err'))),
+      error: (err, _) => Scaffold(body: Center(child: Text('Error: $err'))),
       data: (user) {
         if (user == null) {
-          return const Scaffold(
-            body: Center(child: Text('Not logged in')),
-          );
+          return const Scaffold(body: Center(child: Text('Not logged in')));
         }
 
-        final quizzes =
-            ref.watch(quizListProvider((user.uid, widget.courseId)));
+        final quizzes = ref.watch(
+          quizListProvider((user.uid, widget.courseId)),
+        );
         final quiz = quizzes.firstWhere(
           (q) => q.id == widget.quizId,
           orElse: () => Quiz(
@@ -101,10 +93,7 @@ class _QuizTakePageState extends ConsumerState<QuizTakePage> {
                         child: Text(
                           'Quiz is not ready yet.\nPlease try again later.',
                           textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.black54,
-                          ),
+                          style: TextStyle(fontSize: 14, color: Colors.black54),
                         ),
                       ),
                     ),
@@ -125,10 +114,7 @@ class _QuizTakePageState extends ConsumerState<QuizTakePage> {
           backgroundColor: Colors.white,
           body: SafeArea(
             child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 24,
-                vertical: 16,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -154,10 +140,7 @@ class _QuizTakePageState extends ConsumerState<QuizTakePage> {
                   const SizedBox(height: 16),
                   Expanded(
                     child: showingResults
-                        ? _ResultView(
-                            quiz: quiz,
-                            attempt: submittedAttempt!,
-                          )
+                        ? _ResultView(quiz: quiz, attempt: submittedAttempt!)
                         : _QuestionView(
                             questionIndex: _index,
                             total: quiz.questions.length,
@@ -180,8 +163,7 @@ class _QuizTakePageState extends ConsumerState<QuizTakePage> {
               ? null
               : SafeArea(
                   child: Padding(
-                    padding:
-                        const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                     child: Row(
                       children: [
                         Expanded(
@@ -220,8 +202,7 @@ class _QuizTakePageState extends ConsumerState<QuizTakePage> {
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: _brandBlue,
                                     shape: RoundedRectangleBorder(
-                                      borderRadius:
-                                          BorderRadius.circular(12),
+                                      borderRadius: BorderRadius.circular(12),
                                     ),
                                     elevation: 0,
                                   ),
@@ -234,10 +215,12 @@ class _QuizTakePageState extends ConsumerState<QuizTakePage> {
                                   ),
                                 )
                               : ElevatedButton.icon(
-                                  icon: const Icon(Icons.check),
+                                  icon: const Icon(
+                                    Icons.check,
+                                    color: Colors.white,
+                                  ),
                                   onPressed: () async {
-                                    final answers =
-                                        quiz.questions.map((q) {
+                                    final answers = quiz.questions.map((q) {
                                       final selected =
                                           _selections[q.id]?.toList() ??
                                           const <String>[];
@@ -278,8 +261,7 @@ class _QuizTakePageState extends ConsumerState<QuizTakePage> {
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: _brandBlue,
                                     shape: RoundedRectangleBorder(
-                                      borderRadius:
-                                          BorderRadius.circular(12),
+                                      borderRadius: BorderRadius.circular(12),
                                     ),
                                     elevation: 0,
                                   ),
@@ -287,6 +269,7 @@ class _QuizTakePageState extends ConsumerState<QuizTakePage> {
                                     'Submit',
                                     style: TextStyle(
                                       fontWeight: FontWeight.w600,
+                                      color: Colors.white,
                                     ),
                                   ),
                                 ),
@@ -313,21 +296,15 @@ class _Header extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: onBack,
-        ),
+        IconButton(icon: const Icon(Icons.arrow_back), onPressed: onBack),
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Image.asset(
-              'asset/logo.png',
-              height: 26,
-            ),
+            Image.asset('asset/logo.png', height: 26),
             const SizedBox(width: 6),
           ],
         ),
-        const SizedBox(width: 48), 
+        const SizedBox(width: 48),
       ],
     );
   }
@@ -349,7 +326,7 @@ class _QuestionView extends StatelessWidget {
   final Quiz quiz;
   final Map<String, Set<String>> selections;
   final void Function(String questionId, Set<String> selectedOptionIds)
-      onChanged;
+  onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -386,10 +363,7 @@ class _QuestionView extends StatelessWidget {
             const SizedBox(height: 4),
             const Text(
               'Select all that apply',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.black54,
-              ),
+              style: TextStyle(fontSize: 12, color: Colors.black54),
             ),
           ],
           const SizedBox(height: 16),
@@ -418,8 +392,7 @@ class _QuestionView extends StatelessWidget {
                     ),
                   );
                 } else {
-                  final groupValue =
-                      selected.isEmpty ? null : selected.first;
+                  final groupValue = selected.isEmpty ? null : selected.first;
                   return Card(
                     margin: const EdgeInsets.symmetric(vertical: 4),
                     child: RadioListTile<String>(
@@ -504,9 +477,7 @@ class _ResultView extends StatelessWidget {
                       Row(
                         children: [
                           Icon(
-                            isCorrect
-                                ? Icons.check_circle
-                                : Icons.cancel,
+                            isCorrect ? Icons.check_circle : Icons.cancel,
                             color: isCorrect ? Colors.green : Colors.red,
                           ),
                           const SizedBox(width: 8),
@@ -524,8 +495,7 @@ class _ResultView extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
                       ...q.options.map((o) {
-                        final chosen =
-                            ans.selectedOptionIds.contains(o.id);
+                        final chosen = ans.selectedOptionIds.contains(o.id);
                         final correct = o.isCorrect;
 
                         Color? bgColor;
@@ -548,8 +518,7 @@ class _ResultView extends StatelessWidget {
                           child: Row(
                             children: [
                               if (correct)
-                                const Icon(Icons.check,
-                                    color: Colors.green),
+                                const Icon(Icons.check, color: Colors.green),
                               if (!correct) const SizedBox(width: 0),
                               const SizedBox(width: 6),
                               Expanded(child: Text(o.text)),
@@ -557,8 +526,7 @@ class _ResultView extends StatelessWidget {
                           ),
                         );
                       }),
-                      if (q.explanation != null &&
-                          q.explanation!.isNotEmpty)
+                      if (q.explanation != null && q.explanation!.isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.only(top: 8),
                           child: Text(

@@ -76,20 +76,30 @@ class Quiz {
   static Quiz fromMap(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
     final map = doc.data();
     final rawQuestions = (map['questions'] as List<dynamic>? ?? []);
+    final createdAtRaw = map['createdAt'];
+    final updatedAtRaw = map['updatedAt'];
+    final createdAtTs = createdAtRaw is Timestamp
+        ? createdAtRaw
+        : Timestamp.fromDate(DateTime.now());
+    final updatedAtTs = updatedAtRaw is Timestamp
+        ? updatedAtRaw
+        : Timestamp.fromDate(DateTime.now());
     return Quiz(
       id: map['id'],
       courseId: map['courseId'],
       creatorId: map['creatorId'],
       title: (map['title'] as String?) ?? 'Untitled Quiz',
       vectorStoreId: map['vectorStoreId'],
-      materialIds: (map['materialIds'] as List<dynamic>? ?? []).cast<String>(),
-      numQuestions: map['numQuestions'] ?? 0,
+      materialIds: ((map['materialIds'] as List<dynamic>? ?? []).map(
+        (e) => e.toString(),
+      )).toList(),
+      numQuestions: (map['numQuestions'] as num?)?.toInt() ?? 0,
       status: QuizStatusHelper.fromString(map['status']),
       questions: rawQuestions
           .map((q) => QuizQuestion.fromMap((q as Map<String, dynamic>)))
           .toList(),
-      createdAt: (map['createdAt'] as Timestamp).toDate(),
-      updatedAt: (map['updatedAt'] as Timestamp).toDate(),
+      createdAt: createdAtTs.toDate(),
+      updatedAt: updatedAtTs.toDate(),
     );
   }
 

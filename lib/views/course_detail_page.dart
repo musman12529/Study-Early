@@ -644,27 +644,26 @@ class _CourseDetailPageState extends ConsumerState<CourseDetailPage> {
         _isGenerating = true;
       });
 
-      final quizId = await ref
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Quiz generation started. It will appear in View Quizzes once ready.',
+            ),
+          ),
+        );
+      }
+
+      await ref
           .read(quizListProvider((creatorId, widget.courseId)).notifier)
           .generate(
             materialIds: _selectedMaterialIds.toList(),
             numQuestions: numQuestions.clamp(1, 20),
           );
 
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Quiz generated: $quizId')));
-      }
       setState(() {
         _selectedMaterialIds.clear();
       });
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed to generate quiz: $e')));
-      }
     } finally {
       if (mounted) {
         setState(() {

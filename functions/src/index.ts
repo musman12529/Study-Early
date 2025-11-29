@@ -528,17 +528,20 @@ export const generateQuiz = onCall(
     const {
       userId,
       courseId,
-      vectorStoreId,
       materialIds,
       fileIds,
       numQuestions,
+      instructions,
+      difficulty,
+      includeExplanations,
+      temperature,
     } = req.data ?? {};
 
     // Basic validation
-    if (!userId || !courseId || !vectorStoreId) {
+    if (!userId || !courseId) {
       throw new HttpsError(
         "invalid-argument",
-        "Missing required fields: userId, courseId, vectorStoreId."
+        "Missing required fields: userId, courseId."
       );
     }
 
@@ -558,6 +561,17 @@ export const generateQuiz = onCall(
 
     const numQ: number =
       typeof numQuestions === "number" && numQuestions > 0 ? numQuestions : 5; // default
+    const temp: number =
+      typeof temperature === "number" && temperature >= 0 && temperature <= 1
+        ? temperature
+        : 0.5;
+    const difficultyStr: string =
+      typeof difficulty === "string" &&
+      ["Easy", "Medium", "Hard", "Mixed"].includes(difficulty)
+        ? difficulty
+        : "Mixed";
+    const includeExps: boolean =
+      typeof includeExplanations === "boolean" ? includeExplanations : true;
 
     const db = admin.firestore();
     const openai = new OpenAI({ apiKey: OPENAI_KEY.value() });
@@ -578,13 +592,32 @@ export const generateQuiz = onCall(
     console.log("[Quiz ID]", quizId);
 
     try {
-      // Prompt that matches your Dart models
+      // Prompt that matches your Dart models and honors user customization
+      const customFocus =
+        typeof instructions === "string" && instructions.trim().length > 0
+          ? `\nUser customization and focus areas (follow strictly):\n${instructions.trim()}\n`
+          : "";
+      const difficultyGuidance =
+        difficultyStr === "Easy"
+          ? "Prefer straightforward, recall-level questions with clear, simple wording and obvious distractors."
+          : difficultyStr === "Medium"
+          ? "Prefer a mix of recall and conceptual understanding with moderate distractors."
+          : difficultyStr === "Hard"
+          ? "Prefer deeper conceptual reasoning with trickier distractors and nuanced distinctions."
+          : "Provide a balanced mix across easy, medium and hard.";
+      const explanationField = includeExps
+        ? `,\n              "explanation": "string"               // short explanation of the correct answer`
+        : "";
       const prompt = `
         You are a strict quiz generator for course material.
 
         Create ${numQ} randomized multiple-choice questions (MCQs) grounded ONLY in the
-        provided course material (PDFs and vector store search). Do NOT use any outside
+        provided course material (PDFs). Do NOT use any outside
         knowledge or facts that are not directly supported by the material.
+
+        Difficulty preference: ${difficultyStr}.
+        Guidance: ${difficultyGuidance}
+        ${customFocus}
 
         Each question must:
         - Focus on important concepts from the material.
@@ -608,8 +641,8 @@ export const generateQuiz = onCall(
                   "isCorrect": true | false         // exactly ONE option must be true
                 }
               ],
-              "multipleCorrectAllowed": false,      // always false for now
-              "explanation": "string"               // short explanation of the correct answer
+              "multipleCorrectAllowed": false      // always false for now
+              ${explanationField}
             }
           ]
         }
@@ -627,8 +660,8 @@ export const generateQuiz = onCall(
       console.log("[OpenAI] Calling responses.create for quiz generation...");
 
       const response = await openai.responses.create({
-        model: "gpt-5.1",
-        temperature: 0.7,
+        model: "gpt-4o",
+        temperature: temp,
         input: [
           {
             role: "system",
@@ -708,6 +741,15 @@ export const generateQuiz = onCall(
         }
       }
 
+      // If explanations are disabled, strip them from questions to be safe
+      if (!includeExps && Array.isArray(quizJson.questions)) {
+        for (const q of quizJson.questions) {
+          if (q && typeof q === "object" && "explanation" in q) {
+            delete (q as any).explanation;
+          }
+        }
+      }
+
       // Derive base title and ensure uniqueness
       const baseTitleRaw: string =
         typeof quizJson.title === "string" && quizJson.title.trim().length > 0
@@ -770,12 +812,18 @@ export const generateQuiz = onCall(
         id: quizId,
         courseId,
         creatorId: userId,
-        vectorStoreId,
         materialIds,
         title: uniqueTitle,
         numQuestions: quizJson.questions.length,
         status: "ready",
         questions: quizJson.questions,
+        instructions:
+          typeof instructions === "string" && instructions.trim().length > 0
+            ? instructions.trim()
+            : null,
+        difficulty: difficultyStr,
+        includeExplanations: includeExps,
+        temperature: temp,
         createdAt: now,
         updatedAt: now,
       };

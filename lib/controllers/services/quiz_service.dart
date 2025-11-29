@@ -60,16 +60,6 @@ class QuizService {
     bool? includeExplanations,
     double? temperature,
   }) async {
-    // Load course to get vectorStoreId
-    final courseSnap = await _courseRef(creatorId, courseId).get();
-    final courseData = courseSnap.data();
-    final vectorStoreId = courseData?['vectorStoreId'] as String?;
-    if (vectorStoreId == null || vectorStoreId.isEmpty) {
-      throw StateError(
-        'Course is not indexed yet. Missing vector store. Please index materials first.',
-      );
-    }
-
     // Resolve OpenAI file IDs for the selected materials
     final materialsRef = _courseRef(
       creatorId,
@@ -96,7 +86,6 @@ class QuizService {
         ).httpsCallable('generateQuiz').call({
           'userId': creatorId,
           'courseId': courseId,
-          'vectorStoreId': vectorStoreId,
           'materialIds': materialIds,
           'fileIds': fileIds,
           'numQuestions': numQuestions,

@@ -33,6 +33,10 @@ class QuizListNotifier
   Future<String> generate({
     required List<String> materialIds,
     required int numQuestions,
+    String? instructions,
+    String? difficulty,
+    bool? includeExplanations,
+    double? temperature,
   }) async {
     final creatorId = arg.$1;
     final courseId = arg.$2;
@@ -41,6 +45,10 @@ class QuizListNotifier
       courseId: courseId,
       materialIds: materialIds,
       numQuestions: numQuestions,
+      instructions: instructions,
+      difficulty: difficulty,
+      includeExplanations: includeExplanations,
+      temperature: temperature,
     );
   }
 

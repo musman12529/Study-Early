@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 
 class QuizGenerationOptionsDialog extends StatefulWidget {
   const QuizGenerationOptionsDialog({super.key});
@@ -226,13 +227,23 @@ class _QuizGenerationOptionsDialogState
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.pop<int?>(context, null),
+          onPressed: () => context.pop(null),
           child: const Text('Cancel'),
         ),
         TextButton(
           onPressed: _parsedNumQuestions == null
               ? null
-              : () => Navigator.pop<int>(context, _parsedNumQuestions),
+              : () {
+                  context.pop<Map<String, dynamic>>({
+                    'numQuestions': (_parsedNumQuestions!.clamp(1, 20)),
+                    'instructions': _instructionsController.text.trim().isEmpty
+                        ? null
+                        : _instructionsController.text.trim(),
+                    'difficulty': _difficulty,
+                    'includeExplanations': _includeExplanations,
+                    'temperature': _temperature,
+                  });
+                },
           child: const Text('Generate'),
         ),
       ],

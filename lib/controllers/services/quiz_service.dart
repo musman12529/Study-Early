@@ -55,6 +55,10 @@ class QuizService {
     required String courseId,
     required List<String> materialIds,
     required int numQuestions,
+    String? instructions,
+    String? difficulty,
+    bool? includeExplanations,
+    double? temperature,
   }) async {
     // Load course to get vectorStoreId
     final courseSnap = await _courseRef(creatorId, courseId).get();
@@ -96,6 +100,11 @@ class QuizService {
           'materialIds': materialIds,
           'fileIds': fileIds,
           'numQuestions': numQuestions,
+          if (instructions != null) 'instructions': instructions,
+          if (difficulty != null) 'difficulty': difficulty,
+          if (includeExplanations != null)
+            'includeExplanations': includeExplanations,
+          if (temperature != null) 'temperature': temperature,
         });
 
     final data = result.data as Map<String, dynamic>;

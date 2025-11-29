@@ -12,6 +12,7 @@ import '../controllers/providers/course_providers.dart';
 import '../controllers/providers/quiz_providers.dart';
 import '../models/course_material.dart';
 import 'widgets/notification_bell_button.dart';
+import 'widgets/quiz_generation_options_dialog.dart';
 
 enum _DeleteMaterialChoice { materialOnly, materialAndQuizzes }
 
@@ -566,69 +567,9 @@ class _CourseDetailPageState extends ConsumerState<CourseDetailPage> {
   }
 
   Future<int?> _promptNumQuestions(BuildContext context) async {
-    final controller = TextEditingController(text: '5');
-    int? parsed = 5;
-    String? errorText;
     return showDialog<int>(
       context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              title: const Text('Number of questions'),
-              content: SizedBox(
-                width: 300,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      controller: controller,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      decoration: InputDecoration(
-                        hintText: 'Enter a number from 1 to 20',
-                        errorText: errorText,
-                      ),
-                      onChanged: (value) {
-                        final n = int.tryParse(value);
-                        setState(() {
-                          if (n == null || n < 1 || n > 20) {
-                            errorText = 'Enter a number from 1 to 20';
-                            parsed = null;
-                          } else {
-                            errorText = null;
-                            parsed = n;
-                          }
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 8),
-                    const Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        'Max 20 questions',
-                        style: TextStyle(fontSize: 12, color: Colors.black54),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context, null),
-                  child: const Text('Cancel'),
-                ),
-                TextButton(
-                  onPressed: parsed == null
-                      ? null
-                      : () => Navigator.pop(context, parsed),
-                  child: const Text('Generate'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+      builder: (context) => const QuizGenerationOptionsDialog(),
     );
   }
 

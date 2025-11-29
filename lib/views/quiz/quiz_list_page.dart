@@ -130,18 +130,13 @@ class QuizListPage extends ConsumerWidget {
                             itemBuilder: (context, index) {
                               final q = quizzes[index];
 
-                              final Color statusColor;
-                              if (q.status == QuizStatus.ready) {
-                                statusColor = Colors.green;
-                              } else if (q.status == QuizStatus.error) {
-                                statusColor = Colors.red;
-                              } else {
-                                statusColor = Colors.orange;
-                              }
+                              final Color statusColor = q.questions.isNotEmpty
+                                  ? Colors.green
+                                  : Colors.orange;
 
                               return InkWell(
                                 borderRadius: BorderRadius.circular(18),
-                                onTap: q.status == QuizStatus.ready
+                                onTap: q.questions.isNotEmpty
                                     ? () {
                                         context.pushNamed(
                                           'quizTake',
@@ -207,20 +202,14 @@ class QuizListPage extends ConsumerWidget {
                                               ),
                                             ),
                                             const SizedBox(height: 2),
-                                            Text(
-                                              'Status: ${q.status.asString}',
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                color: statusColor,
-                                              ),
-                                            ),
+                                            // status removed
                                           ],
                                         ),
                                       ),
                                       PopupMenuButton<String>(
                                         onSelected: (value) {
                                           if (value == 'take' &&
-                                              q.status == QuizStatus.ready) {
+                                              q.questions.isNotEmpty) {
                                             context.pushNamed(
                                               'quizTake',
                                               pathParameters: {
@@ -292,8 +281,7 @@ class QuizListPage extends ConsumerWidget {
                                         itemBuilder: (context) => [
                                           PopupMenuItem(
                                             value: 'take',
-                                            enabled:
-                                                q.status == QuizStatus.ready,
+                                            enabled: q.questions.isNotEmpty,
                                             child: const Text('Take quiz'),
                                           ),
                                           const PopupMenuItem(

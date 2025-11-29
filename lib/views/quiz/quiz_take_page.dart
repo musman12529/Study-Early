@@ -51,7 +51,6 @@ class _QuizTakePageState extends ConsumerState<QuizTakePage> {
             vectorStoreId: null,
             materialIds: const [],
             numQuestions: 0,
-            status: QuizStatus.pending,
             questions: const [],
           ),
         );
@@ -64,7 +63,7 @@ class _QuizTakePageState extends ConsumerState<QuizTakePage> {
             : attempts.where((a) => a.id == _submittedAttemptId).firstOrNull;
 
         // Not ready state
-        if (quiz.questions.isEmpty || quiz.status != QuizStatus.ready) {
+        if (quiz.questions.isEmpty) {
           return Scaffold(
             backgroundColor: Colors.white,
             body: SafeArea(

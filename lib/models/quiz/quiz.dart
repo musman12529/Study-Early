@@ -2,8 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
 import 'quiz_question.dart';
 
-enum QuizStatus { pending, generating, ready, error }
-
 enum QuizDifficulty { easy, medium, hard, mixed }
 
 extension QuizDifficultyHelper on QuizDifficulty {
@@ -35,23 +33,6 @@ extension QuizDifficultyHelper on QuizDifficulty {
   }
 }
 
-extension QuizStatusHelper on QuizStatus {
-  static QuizStatus fromString(String? value) {
-    switch (value) {
-      case 'generating':
-        return QuizStatus.generating;
-      case 'ready':
-        return QuizStatus.ready;
-      case 'error':
-        return QuizStatus.error;
-      default:
-        return QuizStatus.pending;
-    }
-  }
-
-  String get asString => toString().split('.').last;
-}
-
 class Quiz {
   final String id;
   final String courseId;
@@ -65,7 +46,6 @@ class Quiz {
   final List<String> materialIds;
 
   final int numQuestions;
-  final QuizStatus status;
   final List<QuizQuestion> questions;
 
   // Generation options
@@ -85,7 +65,6 @@ class Quiz {
     required this.vectorStoreId,
     required this.materialIds,
     required this.numQuestions,
-    this.status = QuizStatus.pending,
     this.questions = const [],
     this.instructions,
     this.difficulty = QuizDifficulty.mixed,
@@ -107,7 +86,6 @@ class Quiz {
       'vectorStoreId': vectorStoreId,
       'materialIds': materialIds,
       'numQuestions': numQuestions,
-      'status': status.asString,
       'questions': questions.map((q) => q.toMap()).toList(),
       'instructions': instructions,
       'difficulty': difficulty.asString,
@@ -139,7 +117,6 @@ class Quiz {
         (e) => e.toString(),
       )).toList(),
       numQuestions: (map['numQuestions'] as num?)?.toInt() ?? 0,
-      status: QuizStatusHelper.fromString(map['status']),
       questions: rawQuestions
           .map((q) => QuizQuestion.fromMap((q as Map<String, dynamic>)))
           .toList(),
@@ -157,7 +134,6 @@ class Quiz {
     String? vectorStoreId,
     List<String>? materialIds,
     int? numQuestions,
-    QuizStatus? status,
     List<QuizQuestion>? questions,
     String? instructions,
     QuizDifficulty? difficulty,
@@ -172,7 +148,6 @@ class Quiz {
       vectorStoreId: vectorStoreId ?? this.vectorStoreId,
       materialIds: materialIds ?? this.materialIds,
       numQuestions: numQuestions ?? this.numQuestions,
-      status: status ?? this.status,
       questions: questions ?? this.questions,
       instructions: instructions ?? this.instructions,
       difficulty: difficulty ?? this.difficulty,

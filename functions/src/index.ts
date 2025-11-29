@@ -1,8 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
-import {
-  onDocumentUpdated,
-  onDocumentWritten,
-} from "firebase-functions/v2/firestore";
+import { onDocumentUpdated } from "firebase-functions/v2/firestore";
 import { defineSecret } from "firebase-functions/params";
 import * as admin from "firebase-admin";
 import OpenAI from "openai";
@@ -815,7 +812,6 @@ export const generateQuiz = onCall(
         materialIds,
         title: uniqueTitle,
         numQuestions: quizJson.questions.length,
-        status: "ready",
         questions: quizJson.questions,
         instructions:
           typeof instructions === "string" && instructions.trim().length > 0
@@ -847,6 +843,26 @@ export const generateQuiz = onCall(
       console.error("========== GENERATE QUIZ ERROR ==========");
       console.error("[Error Message]:", error.message);
       console.error("[Full Error]:", error);
+
+      // Proactively notify failure
+      try {
+        const lastError =
+          (error && (error.message as string)) ?? "Unknown error";
+        await dispatchNotification({
+          userId,
+          courseId,
+          quizId,
+          type: "system",
+          title: "Quiz generation failed",
+          body: `Quiz could not be generated: ${lastError}`,
+          metadata: { lastError },
+        });
+      } catch (notifyErr) {
+        console.error(
+          "[Notifications] Failed to dispatch failure notice",
+          notifyErr
+        );
+      }
 
       const requestId =
         error?.response?.headers?.["x-request-id"] ??
@@ -1322,60 +1338,6 @@ export const onMaterialStatusUpdated = onDocumentUpdated(
         type: "materialIndexFailed",
         title: "Material indexing failed",
         body: `"${fileName}" needs your attention: ${lastError}`,
-        metadata: { status: afterStatus, lastError },
-      });
-    }
-  }
-);
-
-export const onQuizStatusUpdated = onDocumentWritten(
-  {
-    region: REGION,
-    document: "users/{userId}/courses/{courseId}/quizzes/{quizId}",
-  },
-  async (event) => {
-    const before = event.data?.before?.data() as
-      | Record<string, any>
-      | undefined;
-    const after = event.data?.after?.data() as Record<string, any> | undefined;
-
-    if (!after) return;
-
-    const beforeStatus = before?.status;
-    const afterStatus = after.status;
-
-    if (!afterStatus) return;
-    const hadDocumentBefore = event.data?.before?.exists ?? false;
-    if (hadDocumentBefore && beforeStatus === afterStatus) return;
-
-    const userId = event.params.userId as string;
-    const courseId = event.params.courseId as string;
-    const quizId = event.params.quizId as string;
-    const quizTitle = after.title ?? "Quiz";
-
-    if (afterStatus === "ready") {
-      if (!hadDocumentBefore) return; // creation already handled in generateQuiz
-      await dispatchNotification({
-        userId,
-        courseId,
-        quizId,
-        type: "quizReady",
-        title: "Quiz ready",
-        body: `Quiz for "${quizTitle}" has been generated and is ready to attempt.`,
-        metadata: { status: afterStatus },
-      });
-      return;
-    }
-
-    if (afterStatus === "error") {
-      const lastError = after.lastError ?? "Unknown error";
-      await dispatchNotification({
-        userId,
-        courseId,
-        quizId,
-        type: "system",
-        title: "Quiz generation failed",
-        body: `"${quizTitle}" could not be generated: ${lastError}`,
         metadata: { status: afterStatus, lastError },
       });
     }

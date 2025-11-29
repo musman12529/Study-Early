@@ -43,8 +43,7 @@ class QuizListPage extends ConsumerWidget {
     return authState.when(
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (err, stack) =>
-          Scaffold(body: Center(child: Text('Error: $err'))),
+      error: (err, stack) => Scaffold(body: Center(child: Text('Error: $err'))),
       data: (user) {
         if (user == null) {
           return const Scaffold(body: Center(child: Text('Not logged in')));
@@ -68,8 +67,7 @@ class QuizListPage extends ConsumerWidget {
           backgroundColor: Colors.white,
           body: SafeArea(
             child: Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -84,14 +82,11 @@ class QuizListPage extends ConsumerWidget {
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Image.asset(
-                            'asset/logo.png',
-                            height: 26,
-                          ),
+                          Image.asset('asset/logo.png', height: 26),
                           const SizedBox(width: 6),
                         ],
                       ),
-                      const SizedBox(width: 48), 
+                      const SizedBox(width: 48),
                     ],
                   ),
 
@@ -109,10 +104,7 @@ class QuizListPage extends ConsumerWidget {
                   const SizedBox(height: 4),
                   Text(
                     courseTitle,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Colors.black54,
-                    ),
+                    style: const TextStyle(fontSize: 14, color: Colors.black54),
                   ),
 
                   const SizedBox(height: 20),
@@ -175,8 +167,7 @@ class QuizListPage extends ConsumerWidget {
                                       BoxShadow(
                                         blurRadius: 10,
                                         offset: const Offset(0, 4),
-                                        color:
-                                            Colors.black.withOpacity(0.03),
+                                        color: Colors.black.withOpacity(0.03),
                                       ),
                                     ],
                                   ),
@@ -197,8 +188,7 @@ class QuizListPage extends ConsumerWidget {
                                             Text(
                                               q.title,
                                               maxLines: 1,
-                                              overflow:
-                                                  TextOverflow.ellipsis,
+                                              overflow: TextOverflow.ellipsis,
                                               style: const TextStyle(
                                                 fontSize: 16,
                                                 fontWeight: FontWeight.w600,
@@ -209,7 +199,8 @@ class QuizListPage extends ConsumerWidget {
                                             Text(
                                               '${_formatDateTime(q.createdAt)} • '
                                               '${q.numQuestions} questions • '
-                                              '${q.materialIds.length} materials',
+                                              '${q.materialIds.length} materials • '
+                                              '${q.difficulty.asString}',
                                               style: const TextStyle(
                                                 fontSize: 12,
                                                 color: Color(0xFF6B7280),
@@ -229,8 +220,7 @@ class QuizListPage extends ConsumerWidget {
                                       PopupMenuButton<String>(
                                         onSelected: (value) {
                                           if (value == 'take' &&
-                                              q.status ==
-                                                  QuizStatus.ready) {
+                                              q.status == QuizStatus.ready) {
                                             context.pushNamed(
                                               'quizTake',
                                               pathParameters: {
@@ -247,13 +237,12 @@ class QuizListPage extends ConsumerWidget {
                                               },
                                             );
                                           } else if (value == 'delete') {
-                                            _confirmDelete(context)
-                                                .then((ok) async {
+                                            _confirmDelete(context).then((
+                                              ok,
+                                            ) async {
                                               if (ok != true) return;
                                               final messenger =
-                                                  ScaffoldMessenger.of(
-                                                context,
-                                              );
+                                                  ScaffoldMessenger.of(context);
                                               messenger.showSnackBar(
                                                 SnackBar(
                                                   content: Row(
@@ -263,13 +252,11 @@ class QuizListPage extends ConsumerWidget {
                                                         height: 16,
                                                         child:
                                                             CircularProgressIndicator(
-                                                          strokeWidth: 2,
-                                                        ),
+                                                              strokeWidth: 2,
+                                                            ),
                                                       ),
                                                       SizedBox(width: 8),
-                                                      Text(
-                                                        'Deleting quiz…',
-                                                      ),
+                                                      Text('Deleting quiz…'),
                                                     ],
                                                   ),
                                                 ),
@@ -286,7 +273,8 @@ class QuizListPage extends ConsumerWidget {
                                                 messenger.showSnackBar(
                                                   const SnackBar(
                                                     content: Text(
-                                                        'Quiz deleted.'),
+                                                      'Quiz deleted.',
+                                                    ),
                                                   ),
                                                 );
                                               } catch (e) {
@@ -304,22 +292,21 @@ class QuizListPage extends ConsumerWidget {
                                         itemBuilder: (context) => [
                                           PopupMenuItem(
                                             value: 'take',
-                                            enabled: q.status ==
-                                                QuizStatus.ready,
-                                            child:
-                                                const Text('Take quiz'),
+                                            enabled:
+                                                q.status == QuizStatus.ready,
+                                            child: const Text('Take quiz'),
                                           ),
                                           const PopupMenuItem(
                                             value: 'attempts',
-                                            child:
-                                                Text('View attempts'),
+                                            child: Text('View attempts'),
                                           ),
                                           const PopupMenuItem(
                                             value: 'delete',
                                             child: Text(
                                               'Delete quiz',
                                               style: TextStyle(
-                                                  color: Colors.red),
+                                                color: Colors.red,
+                                              ),
                                             ),
                                           ),
                                         ],

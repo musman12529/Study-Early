@@ -580,58 +580,55 @@ export const generateQuiz = onCall(
     try {
       // Prompt that matches your Dart models
       const prompt = `
-You are a strict quiz generator for course material.
+        You are a strict quiz generator for course material.
 
-Create ${numQ} randomized multiple-choice questions (MCQs) grounded ONLY in the
-provided course material (PDFs and vector store search). Do NOT use any outside
-knowledge or facts that are not directly supported by the material.
+        Create ${numQ} randomized multiple-choice questions (MCQs) grounded ONLY in the
+        provided course material (PDFs and vector store search). Do NOT use any outside
+        knowledge or facts that are not directly supported by the material.
 
-Each question must:
-- Focus on important concepts from the material.
-- Be clear and unambiguous.
-- Have exactly one correct answer.
-- Have 3–5 options in total.
-- Be answerable purely from the provided material.
+        Each question must:
+        - Focus on important concepts from the material.
+        - Be clear and unambiguous.
+        - Have exactly one correct answer.
+        - Have 3–5 options in total.
+        - Be answerable purely from the provided material.
 
-Return ONLY a JSON object with this exact shape (no markdown, no extra keys):
+        Return ONLY a JSON object with this exact shape (no markdown, no extra keys):
 
-{
-  "title": "string",                      // concise, human-friendly quiz title (<= 30 chars)
-  "questions": [
-    {
-      "id": "string",                       // unique question id (e.g., "q1", "q2", etc.)
-      "prompt": "string",                   // the question text
-      "options": [
         {
-          "id": "string",                   // unique option id (e.g., "o1", "o2", etc.)
-          "text": "string",                 // option text
-          "isCorrect": true | false         // exactly ONE option must be true
+          "title": "string",                      // concise, human-friendly quiz title (<= 30 chars)
+          "questions": [
+            {
+              "id": "string",                       // unique question id (e.g., "q1", "q2", etc.)
+              "prompt": "string",                   // the question text
+              "options": [
+                {
+                  "id": "string",                   // unique option id (e.g., "o1", "o2", etc.)
+                  "text": "string",                 // option text
+                  "isCorrect": true | false         // exactly ONE option must be true
+                }
+              ],
+              "multipleCorrectAllowed": false,      // always false for now
+              "explanation": "string"               // short explanation of the correct answer
+            }
+          ]
         }
-      ],
-      "multipleCorrectAllowed": false,      // always false for now
-      "explanation": "string"               // short explanation of the correct answer
-    }
-  ]
-}
 
-Rules:
-- Use ONLY facts that appear in the provided material.
-- If a fact is not explicitly in the material, do NOT mention it.
-- Do NOT include any commentary or text outside of the JSON object.
-- Output must be valid JSON only. Do NOT use backticks or code fences.
-`;
+        IMPORTANT REQUIREMENT:
+        Every question must be fully self-contained and understandable without reading
+        the original PDF. If a question involves code, formulas, definitions, examples,
+        or diagrams, you MUST include the relevant snippet directly inside the question.
+
+        Rules:
+        - ALL questions must be fully self-contained.
+        - If the question refers to code, include the code snippet.
+      `;
 
       console.log("[OpenAI] Calling responses.create for quiz generation...");
 
       const response = await openai.responses.create({
-        model: "gpt-4o",
+        model: "gpt-5.1",
         temperature: 0.7,
-        tools: [
-          {
-            type: "file_search",
-            vector_store_ids: [vectorStoreId],
-          },
-        ],
         input: [
           {
             role: "system",
@@ -911,14 +908,22 @@ export const chatWithCourse = onCall(
       );
     }
 
-    if (!courseId || typeof courseId !== "string" || courseId.trim().length === 0) {
+    if (
+      !courseId ||
+      typeof courseId !== "string" ||
+      courseId.trim().length === 0
+    ) {
       throw new HttpsError(
         "invalid-argument",
         "courseId must be a non-empty string."
       );
     }
 
-    if (!message || typeof message !== "string" || message.trim().length === 0) {
+    if (
+      !message ||
+      typeof message !== "string" ||
+      message.trim().length === 0
+    ) {
       throw new HttpsError(
         "invalid-argument",
         "Message must be a non-empty string."
@@ -1018,7 +1023,7 @@ Your responses should be clean, readable plain text that displays well in a chat
       if (Array.isArray(conversationHistory)) {
         const historyLimit = 10;
         const recentHistory = conversationHistory.slice(-historyLimit);
-        
+
         for (const msg of recentHistory) {
           if (
             msg &&
@@ -1030,8 +1035,9 @@ Your responses should be clean, readable plain text that displays well in a chat
             // OpenAI responses.create API requires:
             // - user messages: type "input_text"
             // - assistant messages: type "output_text"
-            const contentType = msg.role === "assistant" ? "output_text" : "input_text";
-            
+            const contentType =
+              msg.role === "assistant" ? "output_text" : "input_text";
+
             messages.push({
               role: msg.role,
               content: [
@@ -1043,7 +1049,7 @@ Your responses should be clean, readable plain text that displays well in a chat
             });
           }
         }
-        
+
         if (conversationHistory.length > historyLimit) {
           console.log(
             `[Warning] Conversation history truncated from ${conversationHistory.length} to ${historyLimit} messages.`
@@ -1283,9 +1289,7 @@ export const onQuizStatusUpdated = onDocumentWritten(
     const before = event.data?.before?.data() as
       | Record<string, any>
       | undefined;
-    const after = event.data?.after?.data() as
-      | Record<string, any>
-      | undefined;
+    const after = event.data?.after?.data() as Record<string, any> | undefined;
 
     if (!after) return;
 

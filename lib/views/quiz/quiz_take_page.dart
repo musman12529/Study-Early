@@ -348,31 +348,30 @@ class _QuestionView extends StatelessWidget {
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            q.prompt,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: _navy,
-            ),
-          ),
-          if (multiple) ...[
-            const SizedBox(height: 4),
-            const Text(
-              'Select all that apply',
-              style: TextStyle(fontSize: 12, color: Colors.black54),
-            ),
-          ],
-          const SizedBox(height: 16),
-          Expanded(
-            child: ListView.builder(
-              itemCount: q.options.length,
-              itemBuilder: (context, idx) {
+      clipBehavior: Clip.antiAlias,
+      child: Scrollbar(
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                q.prompt,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: _navy,
+                ),
+              ),
+              if (multiple) ...[
+                const SizedBox(height: 4),
+                const Text(
+                  'Select all that apply',
+                  style: TextStyle(fontSize: 12, color: Colors.black54),
+                ),
+              ],
+              const SizedBox(height: 16),
+              ...List.generate(q.options.length, (idx) {
                 final opt = q.options[idx];
-
                 if (multiple) {
                   final checked = selected.contains(opt.id);
                   return Card(
@@ -405,10 +404,10 @@ class _QuestionView extends StatelessWidget {
                     ),
                   );
                 }
-              },
-            ),
+              }),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

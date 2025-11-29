@@ -18,6 +18,7 @@ class _QuizGenerationOptionsDialogState
   String _difficulty = 'Mixed';
   bool _includeExplanations = true;
   double _temperature = 0.5;
+  bool _allowMultipleCorrect = false;
 
   int? _parsedNumQuestions = 5;
   String? _errorText;
@@ -153,6 +154,17 @@ class _QuizGenerationOptionsDialogState
 
               const SizedBox(height: 8),
 
+              // Allow multiple correct answers
+              SwitchListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Allow multiple correct answers'),
+                value: _allowMultipleCorrect,
+                onChanged: (v) => setState(() => _allowMultipleCorrect = v),
+              ),
+
+              const SizedBox(height: 8),
+
               // Temperature
               Align(
                 alignment: Alignment.centerLeft,
@@ -242,6 +254,7 @@ class _QuizGenerationOptionsDialogState
                     'difficulty': _difficulty,
                     'includeExplanations': _includeExplanations,
                     'temperature': _temperature,
+                    'allowMultipleCorrect': _allowMultipleCorrect,
                   });
                 },
           child: const Text('Generate'),

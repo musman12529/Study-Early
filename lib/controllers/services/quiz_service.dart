@@ -59,6 +59,7 @@ class QuizService {
     String? difficulty,
     bool? includeExplanations,
     double? temperature,
+    bool? allowMultipleCorrect,
   }) async {
     // Resolve OpenAI file IDs for the selected materials
     final materialsRef = _courseRef(
@@ -94,6 +95,8 @@ class QuizService {
           if (includeExplanations != null)
             'includeExplanations': includeExplanations,
           if (temperature != null) 'temperature': temperature,
+          if (allowMultipleCorrect != null)
+            'allowMultipleCorrect': allowMultipleCorrect,
         });
 
     final data = result.data as Map<String, dynamic>;

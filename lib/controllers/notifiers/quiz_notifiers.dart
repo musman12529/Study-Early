@@ -37,6 +37,7 @@ class QuizListNotifier
     String? difficulty,
     bool? includeExplanations,
     double? temperature,
+    bool? allowMultipleCorrect,
   }) async {
     final creatorId = arg.$1;
     final courseId = arg.$2;
@@ -49,6 +50,7 @@ class QuizListNotifier
       difficulty: difficulty,
       includeExplanations: includeExplanations,
       temperature: temperature,
+      allowMultipleCorrect: allowMultipleCorrect,
     );
   }
 

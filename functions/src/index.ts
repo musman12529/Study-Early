@@ -532,6 +532,7 @@ export const generateQuiz = onCall(
       difficulty,
       includeExplanations,
       temperature,
+      allowMultipleCorrect,
     } = req.data ?? {};
 
     // Basic validation
@@ -569,6 +570,8 @@ export const generateQuiz = onCall(
         : "Mixed";
     const includeExps: boolean =
       typeof includeExplanations === "boolean" ? includeExplanations : true;
+    const allowMultiple: boolean =
+      typeof allowMultipleCorrect === "boolean" ? allowMultipleCorrect : false;
 
     const db = admin.firestore();
     const openai = new OpenAI({ apiKey: OPENAI_KEY.value() });
@@ -605,6 +608,16 @@ export const generateQuiz = onCall(
       const explanationField = includeExps
         ? `,\n              "explanation": "string"               // short explanation of the correct answer`
         : "";
+      const correctRule = allowMultiple
+        ? `- MIX question types: include both single-correct and multiple-correct questions.
+        - Target distribution: roughly 60–80% single-correct and 20–40% multiple-correct.
+        - For each question, set "multipleCorrectAllowed" accordingly:
+          - false for single-correct (EXACTLY one option has "isCorrect": true)
+          - true for multiple-correct (prefer 2–3 options with "isCorrect": true)`
+        : "- Have exactly one correct answer.";
+      const correctComment = allowMultiple
+        ? "one or more options may be true (prefer 2–3 when multipleCorrectAllowed=true)"
+        : "exactly ONE option must be true";
       const prompt = `
         You are a strict quiz generator for course material.
 
@@ -619,7 +632,7 @@ export const generateQuiz = onCall(
         Each question must:
         - Focus on important concepts from the material.
         - Be clear and unambiguous.
-        - Have exactly one correct answer.
+        ${correctRule}
         - Have 3–5 options in total.
         - Be answerable purely from the provided material.
 
@@ -635,10 +648,12 @@ export const generateQuiz = onCall(
                 {
                   "id": "string",                   // unique option id (e.g., "o1", "o2", etc.)
                   "text": "string",                 // option text
-                  "isCorrect": true | false         // exactly ONE option must be true
+                  "isCorrect": true | false         // ${correctComment}
                 }
               ],
-              "multipleCorrectAllowed": false      // always false for now
+              "multipleCorrectAllowed": ${
+                allowMultiple ? "true | false" : "false"
+              }
               ${explanationField}
             }
           ]
@@ -784,7 +799,7 @@ export const generateQuiz = onCall(
         );
       }
 
-      // Optional sanity check: ensure each question has options + exactly one correct
+      // Optional sanity check: ensure each question has options + valid correct count
       for (const q of quizJson.questions) {
         if (!q.options || !Array.isArray(q.options) || q.options.length === 0) {
           throw new HttpsError(
@@ -796,10 +811,46 @@ export const generateQuiz = onCall(
         const correctCount = q.options.filter(
           (o: any) => o.isCorrect === true
         ).length;
-        if (correctCount !== 1) {
-          console.warn(
-            "[Warning] Question does not have exactly one correct option. Correcting format."
+        if (!allowMultiple) {
+          // Single-answer mode only
+          if (correctCount !== 1) {
+            console.warn(
+              "[Warning] Single-answer mode: question does not have exactly one correct option. Proceeding."
+            );
+          }
+          q.multipleCorrectAllowed = false;
+        } else {
+          // Mixed mode: accept either single- or multi-correct
+          const flagProvided = Object.prototype.hasOwnProperty.call(
+            q,
+            "multipleCorrectAllowed"
           );
+          if (!flagProvided) {
+            // Derive the flag from correct count if missing
+            q.multipleCorrectAllowed = correctCount !== 1;
+          }
+          const isMulti = Boolean(q.multipleCorrectAllowed);
+          if (isMulti) {
+            if (correctCount < 1) {
+              console.warn(
+                "[Warning] Mixed mode: multi-correct question has zero correct options."
+              );
+            } else if (correctCount === 1) {
+              console.warn(
+                "[Warning] Mixed mode: multi-correct question has only one correct option."
+              );
+            } else if (correctCount > 3) {
+              console.warn(
+                "[Warning] Mixed mode: multi-correct question has more than 3 correct options."
+              );
+            }
+          } else {
+            if (correctCount !== 1) {
+              console.warn(
+                "[Warning] Mixed mode: single-correct question does not have exactly one correct option."
+              );
+            }
+          }
         }
       }
 

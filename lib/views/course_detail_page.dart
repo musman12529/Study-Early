@@ -604,6 +604,7 @@ class _CourseDetailPageState extends ConsumerState<CourseDetailPage> {
             difficulty: options['difficulty'] as String?,
             includeExplanations: options['includeExplanations'] as bool?,
             temperature: (options['temperature'] as num?)?.toDouble(),
+            allowMultipleCorrect: options['allowMultipleCorrect'] as bool?,
           );
 
       setState(() {

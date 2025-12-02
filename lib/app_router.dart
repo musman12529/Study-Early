@@ -18,6 +18,7 @@ import 'views/quiz/quiz_attempt_detail_page.dart';
 import 'views/chat/chat_page.dart';
 import 'views/auth/onboarding_screen.dart';
 import 'views/professor/professor_dashboard_page.dart';
+import 'views/profile/profile_edit_page.dart';
 import 'views/professor/professor_quiz_view_page.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -136,6 +137,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'onboarding',
         path: '/onboarding',
         builder: (context, state) => const OnboardingScreen(),
+      ),
+      GoRoute(
+        name: 'profileEdit',
+        path: '/profile',
+        builder: (context, state) => const ProfileEditPage(),
       ),
       GoRoute(
         name: 'professorDashboard',

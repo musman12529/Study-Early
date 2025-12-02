@@ -1,27 +1,56 @@
+import 'dart:typed_data';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:studyearly/controllers/services/user_service.dart';
+import 'package:studyearly/controllers/providers/profile_photo_provider.dart';
 
-class OnboardingScreen extends StatefulWidget {
+class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
 
   @override
-  State<OnboardingScreen> createState() => _OnboardingScreenState();
+  ConsumerState<OnboardingScreen> createState() => _OnboardingScreenState();
 }
 
-class _OnboardingScreenState extends State<OnboardingScreen> {
+class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final _formKey = GlobalKey<FormState>();
   final _displayNameController = TextEditingController();
-  final _photoUrlController = TextEditingController();
   bool _isSaving = false;
+  Uint8List? _photoBytes;
+  String? _photoPath;
+  String? _photoFileName;
 
   @override
   void dispose() {
     _displayNameController.dispose();
-    _photoUrlController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickPhoto() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      allowMultiple: false,
+      withData: kIsWeb,
+    );
+    if (result == null) return;
+    final f = result.files.single;
+    setState(() {
+      _photoFileName = f.name;
+      _photoBytes = f.bytes;
+      _photoPath = f.path;
+    });
+    // Update controller state
+    ref
+        .read(profilePhotoProvider.notifier)
+        .setSelected(
+          fileName: _photoFileName ?? 'photo',
+          previewBytes: _photoBytes,
+          path: _photoPath,
+        );
   }
 
   Future<void> _saveProfile() async {
@@ -33,18 +62,20 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       final firestore = FirebaseFirestore.instance;
       final users = UserService(firestore);
       final displayName = _displayNameController.text.trim();
-      final photoUrl = _photoUrlController.text.trim();
+      final photoUrl = await ref
+          .read(profilePhotoProvider.notifier)
+          .upload(user.uid);
 
       await users.updateBasicProfile(
         userId: user.uid,
         displayName: displayName,
-        photoUrl: photoUrl.isEmpty ? null : photoUrl,
+        photoUrl: photoUrl,
       );
 
       if (displayName.isNotEmpty) {
         await user.updateDisplayName(displayName);
       }
-      if (photoUrl.isNotEmpty) {
+      if (photoUrl != null && photoUrl.isNotEmpty) {
         await user.updatePhotoURL(photoUrl);
       }
       if (mounted) context.go('/home');
@@ -118,24 +149,53 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       ),
                       const SizedBox(height: 16),
                     ],
+                    // Photo picker + preview
+                    Row(
+                      children: [
+                        Container(
+                          width: 64,
+                          height: 64,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: const Color(0xFFE5E7EB),
+                            image:
+                                (ref.watch(profilePhotoProvider).previewBytes !=
+                                    null)
+                                ? DecorationImage(
+                                    image: MemoryImage(
+                                      ref
+                                          .watch(profilePhotoProvider)
+                                          .previewBytes!,
+                                    ),
+                                    fit: BoxFit.cover,
+                                  )
+                                : null,
+                          ),
+                          child:
+                              (ref.watch(profilePhotoProvider).previewBytes ==
+                                  null)
+                              ? const Icon(Icons.person, color: Colors.white70)
+                              : null,
+                        ),
+                        const SizedBox(width: 12),
+                        OutlinedButton.icon(
+                          onPressed: _isSaving ? null : _pickPhoto,
+                          icon: const Icon(Icons.photo_camera),
+                          label: const Text('Choose photo'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
                     TextFormField(
                       controller: _displayNameController,
                       decoration: const InputDecoration(
-                        labelText: 'Display name',
+                        labelText: 'Full Name',
                         border: UnderlineInputBorder(),
                       ),
                       validator: (value) =>
                           (value == null || value.trim().isEmpty)
-                          ? 'Display name is required'
+                          ? 'Full Name is required'
                           : null,
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _photoUrlController,
-                      decoration: const InputDecoration(
-                        labelText: 'Photo URL (optional)',
-                        border: UnderlineInputBorder(),
-                      ),
                     ),
                     const SizedBox(height: 24),
                     SizedBox(

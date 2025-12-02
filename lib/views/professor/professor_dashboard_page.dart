@@ -71,6 +71,52 @@ class _ProfessorDashboardPageState
                       ),
                       Row(
                         children: [
+                          GestureDetector(
+                            onTap: () => context.pushNamed('profileEdit'),
+                            child: (() {
+                              final photoUrl = profile.photoUrl;
+                              final displayName = profile.displayName ?? '';
+                              String initials = '';
+                              if (displayName.isNotEmpty) {
+                                final parts = displayName.trim().split(
+                                  RegExp(r'\\s+'),
+                                );
+                                if (parts.isNotEmpty) {
+                                  initials = parts
+                                      .take(2)
+                                      .map(
+                                        (p) => p.isNotEmpty
+                                            ? p[0].toUpperCase()
+                                            : '',
+                                      )
+                                      .join();
+                                }
+                              }
+                              return Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 16,
+                                    backgroundImage:
+                                        (photoUrl != null &&
+                                            photoUrl.isNotEmpty)
+                                        ? NetworkImage(photoUrl)
+                                        : null,
+                                    child:
+                                        (photoUrl == null || photoUrl.isEmpty)
+                                        ? Text(
+                                            initials,
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          )
+                                        : null,
+                                  ),
+                                  const SizedBox(width: 12),
+                                ],
+                              );
+                            })(),
+                          ),
                           NotificationBellButton(
                             userId: user.uid,
                             onPressed: () {
@@ -92,39 +138,28 @@ class _ProfessorDashboardPageState
                     ],
                   ),
                   const SizedBox(height: 24),
-                  const Text(
-                    'Dashboard',
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF101828),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Students',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      color: _navy,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Add student (coming soon)'),
+                  // Friendly greeting (prominent)
+                  Builder(
+                    builder: (context) {
+                      final displayName = profile.displayName ?? '';
+                      final firstName = displayName.isNotEmpty
+                          ? displayName.trim().split(RegExp(r'\\s+')).first
+                          : '';
+                      if (firstName.isEmpty) return const SizedBox.shrink();
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Text(
+                          'Hey, $firstName',
+                          style: const TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF101828),
+                          ),
                         ),
                       );
                     },
-                    icon: const Icon(Icons.person_add),
-                    label: const Text('Add student'),
                   ),
                   const SizedBox(height: 24),
-                  const Divider(),
-                  const SizedBox(height: 16),
                   const Text(
                     'Your Courses',
                     style: TextStyle(

@@ -18,6 +18,7 @@ import 'views/quiz/quiz_attempt_detail_page.dart';
 import 'views/chat/chat_page.dart';
 import 'views/auth/onboarding_screen.dart';
 import 'views/professor/professor_dashboard_page.dart';
+import 'views/professor/professor_quiz_view_page.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authStateChangesProvider);
@@ -140,6 +141,15 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'professorDashboard',
         path: '/professor',
         builder: (context, state) => const ProfessorDashboardPage(),
+      ),
+      GoRoute(
+        name: 'professorQuizView',
+        path: '/course/:courseId/quiz/:quizId/professor',
+        builder: (context, state) {
+          final courseId = state.pathParameters['courseId']!;
+          final quizId = state.pathParameters['quizId']!;
+          return ProfessorQuizViewPage(courseId: courseId, quizId: quizId);
+        },
       ),
       GoRoute(
         name: 'courseDetail',

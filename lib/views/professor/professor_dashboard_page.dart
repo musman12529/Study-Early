@@ -1,15 +1,13 @@
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:file_picker/file_picker.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../controllers/providers/auth_providers.dart';
-import '../../controllers/providers/course_material_provider.dart';
 import '../../controllers/providers/course_providers.dart';
 import '../../controllers/providers/user_providers.dart';
 import '../../models/user_profile.dart';
 import '../widgets/notification_bell_button.dart';
+import 'package:go_router/go_router.dart';
 
 class ProfessorDashboardPage extends ConsumerStatefulWidget {
   const ProfessorDashboardPage({super.key});
@@ -22,10 +20,8 @@ class ProfessorDashboardPage extends ConsumerStatefulWidget {
 class _ProfessorDashboardPageState
     extends ConsumerState<ProfessorDashboardPage> {
   static const Color _navy = Color(0xFF101828);
-  static const Color _accentRed = Color(0xFFFF6B6B);
 
   String? _selectedCourseId;
-  bool _isUploading = false;
 
   @override
   Widget build(BuildContext context) {
@@ -105,86 +101,7 @@ class _ProfessorDashboardPageState
                     ),
                   ),
                   const SizedBox(height: 24),
-                  const Text(
-                    'Manage Materials',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      color: _navy,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  if (courses.isEmpty)
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey.shade300),
-                      ),
-                      child: const Text(
-                        'No courses yet. Create a course first to upload PDFs.',
-                        style: TextStyle(color: Colors.black54),
-                      ),
-                    )
-                  else
-                    Row(
-                      children: [
-                        Expanded(
-                          child: DropdownButtonFormField<String>(
-                            value: _selectedCourseId,
-                            items: [
-                              for (final c in courses)
-                                DropdownMenuItem(
-                                  value: c.id,
-                                  child: Text(
-                                    c.title,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                            ],
-                            onChanged: (v) =>
-                                setState(() => _selectedCourseId = v),
-                            decoration: const InputDecoration(
-                              labelText: 'Course',
-                              border: OutlineInputBorder(),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        ElevatedButton.icon(
-                          onPressed: (_isUploading || _selectedCourseId == null)
-                              ? null
-                              : () => _pickUploadAndIndex(
-                                  context,
-                                  ref,
-                                  user,
-                                  _selectedCourseId!,
-                                ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _accentRed,
-                            foregroundColor: Colors.white,
-                          ),
-                          icon: _isUploading
-                              ? const SizedBox(
-                                  height: 18,
-                                  width: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : const Icon(Icons.file_upload),
-                          label: Text(
-                            _isUploading ? 'Uploading...' : 'Upload PDF',
-                          ),
-                        ),
-                      ],
-                    ),
-                  const SizedBox(height: 24),
-                  const Divider(),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 8),
                   const Text(
                     'Students',
                     style: TextStyle(
@@ -205,6 +122,143 @@ class _ProfessorDashboardPageState
                     icon: const Icon(Icons.person_add),
                     label: const Text('Add student'),
                   ),
+                  const SizedBox(height: 24),
+                  const Divider(),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Your Courses',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: _navy,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: courses.isEmpty
+                        ? const Center(
+                            child: Text(
+                              'No courses yet. Tap "+ New Course" to add one.',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.black54,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          )
+                        : ListView.separated(
+                            itemCount: courses.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: 12),
+                            itemBuilder: (context, index) {
+                              final course = courses[index];
+                              return InkWell(
+                                borderRadius: BorderRadius.circular(18),
+                                onTap: () {
+                                  // Navigate to course detail (materials + quizzes)
+                                  context.pushNamed(
+                                    'courseDetail',
+                                    pathParameters: {'courseId': course.id},
+                                  );
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 14,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(18),
+                                    border: Border.all(
+                                      color: Colors.grey.shade300,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 4),
+                                        color: Colors.black.withOpacity(0.03),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          course.title,
+                                          style: const TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xFF101828),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        final controller = TextEditingController();
+                        final result = await showDialog<String>(
+                          context: context,
+                          builder: (context) {
+                            return AlertDialog(
+                              title: const Text('Add Course'),
+                              content: TextField(
+                                controller: controller,
+                                decoration: const InputDecoration(
+                                  labelText: 'Course name',
+                                  hintText: 'e.g. COMP 101',
+                                ),
+                                autofocus: true,
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.of(context).pop(),
+                                  child: const Text('Cancel'),
+                                ),
+                                ElevatedButton(
+                                  onPressed: () {
+                                    final title = controller.text.trim();
+                                    Navigator.of(context).pop(title);
+                                  },
+                                  child: const Text('Add'),
+                                ),
+                              ],
+                            );
+                          },
+                        );
+                        final title = result?.trim();
+                        if (title != null && title.isNotEmpty) {
+                          await ref
+                              .read(courseListProvider(user.uid).notifier)
+                              .add(title: title);
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF1A73E8),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: const Text(
+                        '+ New Course',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -214,52 +268,5 @@ class _ProfessorDashboardPageState
     );
   }
 
-  Future<void> _pickUploadAndIndex(
-    BuildContext context,
-    WidgetRef ref,
-    User user,
-    String courseId,
-  ) async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: const ['pdf'],
-      withData: kIsWeb,
-    );
-
-    if (result == null) return;
-
-    final picked = result.files.single;
-
-    try {
-      setState(() {
-        _isUploading = true;
-      });
-
-      await ref
-          .read(courseMaterialListProvider((user.uid, courseId)).notifier)
-          .uploadAndIndex(
-            fileName: picked.name,
-            filePath: kIsWeb ? null : picked.path,
-            fileBytes: kIsWeb ? picked.bytes : null,
-          );
-
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Upload + indexing started.')),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error: $e')));
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isUploading = false;
-        });
-      }
-    }
-  }
+  // (Material upload removed; professors can manage materials inside course pages)
 }

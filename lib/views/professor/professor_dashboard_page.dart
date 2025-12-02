@@ -192,6 +192,87 @@ class _ProfessorDashboardPageState
                                           ),
                                         ),
                                       ),
+                                      IconButton(
+                                        icon: const Icon(Icons.delete_outline),
+                                        onPressed: () async {
+                                          final confirm = await showDialog<bool>(
+                                            context: context,
+                                            builder: (context) {
+                                              return AlertDialog(
+                                                title: const Text(
+                                                  "Delete Course?",
+                                                ),
+                                                content: const Text(
+                                                  "This will permanently delete:\n"
+                                                  "• All materials and their PDF files\n"
+                                                  "• OpenAI vector store data\n"
+                                                  "• All quizzes in this course\n"
+                                                  "• All attempts for those quizzes\n\n"
+                                                  "This action cannot be undone.",
+                                                ),
+                                                actions: [
+                                                  TextButton(
+                                                    onPressed: () =>
+                                                        Navigator.pop(
+                                                          context,
+                                                          false,
+                                                        ),
+                                                    child: const Text("Cancel"),
+                                                  ),
+                                                  TextButton(
+                                                    onPressed: () =>
+                                                        Navigator.pop(
+                                                          context,
+                                                          true,
+                                                        ),
+                                                    child: const Text(
+                                                      "Delete",
+                                                      style: TextStyle(
+                                                        color: Colors.red,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              );
+                                            },
+                                          );
+                                          if (confirm != true) return;
+
+                                          final messenger =
+                                              ScaffoldMessenger.of(context);
+                                          messenger.showSnackBar(
+                                            const SnackBar(
+                                              content: _DeletingSnackBar(
+                                                label: "Deleting course…",
+                                              ),
+                                            ),
+                                          );
+                                          try {
+                                            await ref
+                                                .read(
+                                                  courseListProvider(
+                                                    user.uid,
+                                                  ).notifier,
+                                                )
+                                                .remove(course.id);
+                                            messenger.showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                  "Course deleted successfully.",
+                                                ),
+                                              ),
+                                            );
+                                          } catch (e) {
+                                            messenger.showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                  "Failed to delete course: $e",
+                                                ),
+                                              ),
+                                            );
+                                          }
+                                        },
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -269,4 +350,24 @@ class _ProfessorDashboardPageState
   }
 
   // (Material upload removed; professors can manage materials inside course pages)
+}
+
+class _DeletingSnackBar extends StatelessWidget {
+  const _DeletingSnackBar({required this.label});
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const SizedBox(
+          width: 16,
+          height: 16,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+        const SizedBox(width: 8),
+        Expanded(child: Text(label, overflow: TextOverflow.ellipsis)),
+      ],
+    );
+  }
 }

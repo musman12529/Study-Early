@@ -17,6 +17,7 @@ import 'views/quiz/quiz_attempts_page.dart';
 import 'views/quiz/quiz_attempt_detail_page.dart';
 import 'views/chat/chat_page.dart';
 import 'views/auth/onboarding_screen.dart';
+import 'views/professor/professor_dashboard_page.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authStateChangesProvider);
@@ -38,6 +39,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       final goingToProfessorSignUp =
           state.matchedLocation == '/signup/professor';
       final goingToOnboarding = state.matchedLocation == '/onboarding';
+      final goingToProfessorDashboard = state.matchedLocation == '/professor';
+      final goingToHome = state.matchedLocation == '/home';
       final goingToRoleSelection = state.matchedLocation == '/';
 
       if (!loggedIn) {
@@ -58,12 +61,31 @@ final routerProvider = Provider<GoRouter>((ref) {
       final profile = profileState.asData?.value;
       final needsOnboarding =
           profile == null || ((profile.displayName ?? '').trim().isEmpty);
+      final isProfessor = profile != null && profile.role == UserRole.professor;
       if (needsOnboarding && !goingToOnboarding) {
         return '/onboarding';
       }
 
       if (!needsOnboarding && goingToOnboarding) {
+        return isProfessor ? '/professor' : '/home';
+      }
+
+      // Gate professor dashboard to professors only
+      if (goingToProfessorDashboard &&
+          profile != null &&
+          profile.role != UserRole.professor) {
         return '/home';
+      }
+
+      // Route professors to their dashboard by default from generic pages
+      if (isProfessor &&
+          (goingToRoleSelection ||
+              goingToLogin ||
+              goingToSignUp ||
+              goingToStudentSignUp ||
+              goingToProfessorSignUp ||
+              goingToHome)) {
+        return '/professor';
       }
 
       if (goingToLogin ||
@@ -113,6 +135,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'onboarding',
         path: '/onboarding',
         builder: (context, state) => const OnboardingScreen(),
+      ),
+      GoRoute(
+        name: 'professorDashboard',
+        path: '/professor',
+        builder: (context, state) => const ProfessorDashboardPage(),
       ),
       GoRoute(
         name: 'courseDetail',

@@ -8,16 +8,20 @@ import '../views/auth/sign_up_screen.dart';
 import '../views/auth/error_screen.dart';
 import '../views/notifications/notifications_page.dart';
 import 'controllers/providers/auth_providers.dart';
+import 'controllers/providers/user_providers.dart';
+import 'models/user_profile.dart';
 import 'views/course_detail_page.dart';
 import 'views/quiz/quiz_list_page.dart';
 import 'views/quiz/quiz_take_page.dart';
 import 'views/quiz/quiz_attempts_page.dart';
 import 'views/quiz/quiz_attempt_detail_page.dart';
 import 'views/chat/chat_page.dart';
+import 'views/auth/onboarding_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authStateChangesProvider);
   final user = authState.asData?.value;
+  final profileState = ref.watch(userProfileStreamProvider);
 
   return GoRouter(
     initialLocation: '/',
@@ -25,20 +29,48 @@ final routerProvider = Provider<GoRouter>((ref) {
 
     redirect: (context, state) {
       if (authState.isLoading) return null;
+      final profileLoading = profileState.isLoading;
 
       final loggedIn = user != null;
       final goingToLogin = state.matchedLocation == '/login';
       final goingToSignUp = state.matchedLocation == '/signup';
+      final goingToStudentSignUp = state.matchedLocation == '/signup/student';
+      final goingToProfessorSignUp =
+          state.matchedLocation == '/signup/professor';
+      final goingToOnboarding = state.matchedLocation == '/onboarding';
       final goingToRoleSelection = state.matchedLocation == '/';
 
       if (!loggedIn) {
-        if (goingToLogin || goingToSignUp || goingToRoleSelection) {
+        if (goingToLogin ||
+            goingToSignUp ||
+            goingToStudentSignUp ||
+            goingToProfessorSignUp ||
+            goingToRoleSelection) {
           return null;
         }
         return '/login';
       }
 
-      if (goingToLogin || goingToSignUp || goingToRoleSelection) {
+      if (profileLoading) {
+        return null;
+      }
+
+      final profile = profileState.asData?.value;
+      final needsOnboarding =
+          profile == null || ((profile.displayName ?? '').trim().isEmpty);
+      if (needsOnboarding && !goingToOnboarding) {
+        return '/onboarding';
+      }
+
+      if (!needsOnboarding && goingToOnboarding) {
+        return '/home';
+      }
+
+      if (goingToLogin ||
+          goingToSignUp ||
+          goingToStudentSignUp ||
+          goingToProfessorSignUp ||
+          goingToRoleSelection) {
         return '/home';
       }
 
@@ -65,6 +97,22 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'signup',
         path: '/signup',
         builder: (context, state) => const SignUpScreen(),
+      ),
+      GoRoute(
+        name: 'signupStudent',
+        path: '/signup/student',
+        builder: (context, state) => const SignUpScreen(role: UserRole.student),
+      ),
+      GoRoute(
+        name: 'signupProfessor',
+        path: '/signup/professor',
+        builder: (context, state) =>
+            const SignUpScreen(role: UserRole.professor),
+      ),
+      GoRoute(
+        name: 'onboarding',
+        path: '/onboarding',
+        builder: (context, state) => const OnboardingScreen(),
       ),
       GoRoute(
         name: 'courseDetail',

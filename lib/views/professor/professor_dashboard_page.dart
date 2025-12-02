@@ -121,9 +121,7 @@ class _ProfessorDashboardPageState
                             userId: user.uid,
                             onPressed: () {
                               if (context.mounted) {
-                                Navigator.of(
-                                  context,
-                                ).pushNamed('notifications');
+                                context.pushNamed('notifications');
                               }
                             },
                           ),

@@ -155,6 +155,15 @@ class HomePage extends ConsumerWidget {
                   ),
 
                   const SizedBox(height: 24),
+                  const Text(
+                    'Your Courses',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF101828),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
 
                   // Course list
                   Expanded(

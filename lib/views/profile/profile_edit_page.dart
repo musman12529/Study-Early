@@ -25,12 +25,18 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ref.read(profilePhotoProvider.notifier).clear();
+      }
+    });
     final profile = ref.read(userProfileStreamProvider).asData?.value;
     _nameController = TextEditingController(text: profile?.displayName ?? '');
   }
 
   @override
   void dispose() {
+    ref.read(profilePhotoProvider.notifier).clear();
     _nameController.dispose();
     super.dispose();
   }

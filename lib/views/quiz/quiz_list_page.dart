@@ -210,9 +210,9 @@ class QuizListPage extends ConsumerWidget {
                                             ),
                                             const SizedBox(height: 4),
                                             Text(
-                                              '${_formatDateTime(q.createdAt)} • '
-                                              '${q.numQuestions} questions • '
-                                              '${q.materialIds.length} materials • '
+                                              '${_formatDateTime(q.createdAt)} - '
+                                              '${q.numQuestions} questions - '
+                                              '${q.materialIds.length} materials - '
                                               '${q.difficulty.asString}',
                                               style: const TextStyle(
                                                 fontSize: 12,
@@ -326,7 +326,10 @@ class QuizListPage extends ConsumerWidget {
                                                   'Download quiz PDF',
                                                 ),
                                                 onTap: () async {
-                                                  await _downloadQuizPdf(q);
+                                                  await _downloadQuizPdf(
+                                                    context,
+                                                    q,
+                                                  );
                                                 },
                                               ),
                                               PopupMenuItem(
@@ -336,7 +339,10 @@ class QuizListPage extends ConsumerWidget {
                                                   'Download answers PDF',
                                                 ),
                                                 onTap: () async {
-                                                  await _downloadAnswersPdf(q);
+                                                  await _downloadAnswersPdf(
+                                                    context,
+                                                    q,
+                                                  );
                                                 },
                                               ),
                                               const PopupMenuItem(
@@ -390,14 +396,46 @@ class QuizListPage extends ConsumerWidget {
   }
 }
 
-Future<void> _downloadQuizPdf(Quiz quiz) async {
-  final Uint8List bytes = await buildQuizPdf(quiz);
-  await Printing.sharePdf(bytes: bytes, filename: '${quiz.title}_quiz.pdf');
+Future<void> _downloadQuizPdf(BuildContext context, Quiz quiz) async {
+  try {
+    final Uint8List bytes = await buildQuizPdf(quiz);
+    final name = _sanitizeFileName('${quiz.title}_quiz.pdf');
+    await Printing.sharePdf(bytes: bytes, filename: name);
+    if (context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Quiz PDF ready.')));
+    }
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to prepare PDF: $e')));
+    }
+  }
 }
 
-Future<void> _downloadAnswersPdf(Quiz quiz) async {
-  final Uint8List bytes = await buildAnswersPdf(quiz);
-  await Printing.sharePdf(bytes: bytes, filename: '${quiz.title}_answers.pdf');
+Future<void> _downloadAnswersPdf(BuildContext context, Quiz quiz) async {
+  try {
+    final Uint8List bytes = await buildAnswersPdf(quiz);
+    final name = _sanitizeFileName('${quiz.title}_answers.pdf');
+    await Printing.sharePdf(bytes: bytes, filename: name);
+    if (context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Answer key PDF ready.')));
+    }
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to prepare PDF: $e')));
+    }
+  }
+}
+
+String _sanitizeFileName(String name) {
+  return name.replaceAll(RegExp(r'[\\/:*?"<>|]+'), '_').trim();
 }
 
 String _two(int v) => v.toString().padLeft(2, '0');

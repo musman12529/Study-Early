@@ -17,7 +17,7 @@ Future<Uint8List> buildQuizPdf(Quiz quiz) async {
           ),
           pw.SizedBox(height: 8),
           pw.Text(
-            '${quiz.numQuestions} questions • Difficulty: ${quiz.difficulty.asString}',
+            '${quiz.numQuestions} questions - Difficulty: ${quiz.difficulty.asString}',
             style: const pw.TextStyle(fontSize: 12),
           ),
           pw.SizedBox(height: 16),
@@ -37,12 +37,12 @@ Future<Uint8List> buildAnswersPdf(Quiz quiz) async {
       build: (context) {
         return [
           pw.Text(
-            '${quiz.title} — Answer Key',
+            '${quiz.title} - Answer Key',
             style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold),
           ),
           pw.SizedBox(height: 8),
           pw.Text(
-            '${quiz.numQuestions} questions • Difficulty: ${quiz.difficulty.asString}',
+            '${quiz.numQuestions} questions - Difficulty: ${quiz.difficulty.asString}',
             style: const pw.TextStyle(fontSize: 12),
           ),
           pw.SizedBox(height: 16),
@@ -54,7 +54,10 @@ Future<Uint8List> buildAnswersPdf(Quiz quiz) async {
   return doc.save();
 }
 
-List<pw.Widget> _buildQuestionList(List<QuizQuestion> questions, {required bool showAnswers}) {
+List<pw.Widget> _buildQuestionList(
+  List<QuizQuestion> questions, {
+  required bool showAnswers,
+}) {
   final items = <pw.Widget>[];
   for (int i = 0; i < questions.length; i++) {
     final q = questions[i];
@@ -76,7 +79,17 @@ List<pw.Widget> _buildQuestionList(List<QuizQuestion> questions, {required bool 
                   child: pw.Row(
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
-                      pw.Text('• ', style: const pw.TextStyle(fontSize: 12)),
+                      pw.Container(
+                        width: 10,
+                        height: 10,
+                        margin: const pw.EdgeInsets.only(right: 6, top: 2),
+                        decoration: pw.BoxDecoration(
+                          color: showAnswers && opt.isCorrect
+                              ? PdfColors.black
+                              : null,
+                          border: pw.Border.all(width: 1),
+                        ),
+                      ),
                       pw.Expanded(
                         child: pw.Text(
                           opt.text,
@@ -88,17 +101,6 @@ List<pw.Widget> _buildQuestionList(List<QuizQuestion> questions, {required bool 
                           ),
                         ),
                       ),
-                      if (showAnswers && opt.isCorrect)
-                        pw.Padding(
-                          padding: const pw.EdgeInsets.only(left: 6),
-                          child: pw.Text(
-                            '(correct)',
-                            style: pw.TextStyle(
-                              fontSize: 11,
-                              color: PdfColors.green800,
-                            ),
-                          ),
-                        ),
                     ],
                   ),
                 ),
@@ -110,10 +112,7 @@ List<pw.Widget> _buildQuestionList(List<QuizQuestion> questions, {required bool 
               'Explanation:',
               style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
             ),
-            pw.Text(
-              q.explanation!,
-              style: const pw.TextStyle(fontSize: 11),
-            ),
+            pw.Text(q.explanation!, style: const pw.TextStyle(fontSize: 11)),
           ],
           pw.SizedBox(height: 14),
         ],
@@ -122,5 +121,3 @@ List<pw.Widget> _buildQuestionList(List<QuizQuestion> questions, {required bool 
   }
   return items;
 }
-
-

@@ -127,15 +127,7 @@ class ProfessorQuizViewPage extends ConsumerWidget {
                           child: ElevatedButton.icon(
                             onPressed: quiz.questions.isEmpty
                                 ? null
-                                : () async {
-                                    final Uint8List bytes = await buildQuizPdf(
-                                      quiz,
-                                    );
-                                    await Printing.sharePdf(
-                                      bytes: bytes,
-                                      filename: '${quiz.title}_quiz.pdf',
-                                    );
-                                  },
+                                : () => _handleDownloadQuiz(context, quiz),
                             icon: const Icon(Icons.download, size: 18),
                             label: const Text('Quiz PDF'),
                             style: ElevatedButton.styleFrom(
@@ -157,14 +149,7 @@ class ProfessorQuizViewPage extends ConsumerWidget {
                           child: OutlinedButton.icon(
                             onPressed: quiz.questions.isEmpty
                                 ? null
-                                : () async {
-                                    final Uint8List bytes =
-                                        await buildAnswersPdf(quiz);
-                                    await Printing.sharePdf(
-                                      bytes: bytes,
-                                      filename: '${quiz.title}_answers.pdf',
-                                    );
-                                  },
+                                : () => _handleDownloadAnswers(context, quiz),
                             icon: const Icon(Icons.download_done, size: 18),
                             label: const Text('Answers PDF'),
                             style: OutlinedButton.styleFrom(
@@ -289,4 +274,46 @@ class _QuestionTile extends StatelessWidget {
 
 class _ProfessorQuizViewPageStyles {
   static const Color navy = Color(0xFF101828);
+}
+
+String _sanitizeFileName(String name) {
+  return name.replaceAll(RegExp(r'[\\/:*?"<>|]+'), '_').trim();
+}
+
+Future<void> _handleDownloadQuiz(BuildContext context, Quiz quiz) async {
+  try {
+    final Uint8List bytes = await buildQuizPdf(quiz);
+    final name = _sanitizeFileName('${quiz.title}_quiz.pdf');
+    await Printing.sharePdf(bytes: bytes, filename: name);
+    if (context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Quiz PDF ready.')));
+    }
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to prepare PDF: $e')));
+    }
+  }
+}
+
+Future<void> _handleDownloadAnswers(BuildContext context, Quiz quiz) async {
+  try {
+    final Uint8List bytes = await buildAnswersPdf(quiz);
+    final name = _sanitizeFileName('${quiz.title}_answers.pdf');
+    await Printing.sharePdf(bytes: bytes, filename: name);
+    if (context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Answer key PDF ready.')));
+    }
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to prepare PDF: $e')));
+    }
+  }
 }

@@ -533,6 +533,7 @@ export const generateQuiz = onCall(
       includeExplanations,
       temperature,
       allowMultipleCorrect,
+      role,
     } = req.data ?? {};
 
     // Basic validation
@@ -878,13 +879,22 @@ export const generateQuiz = onCall(
       console.log("[Firestore] Saving quiz document...");
       await quizRef.set(quizData);
 
+      const roleStr =
+        typeof role === "string" && role.toLowerCase() === "professor"
+          ? "professor"
+          : "student";
+      const bodyText =
+        roleStr === "professor"
+          ? `Quiz for "${uniqueTitle}" has been generated and is ready to view or download.`
+          : `Quiz for "${uniqueTitle}" has been generated and is ready to attempt.`;
+
       await dispatchNotification({
         userId,
         courseId,
         quizId,
         type: "quizReady",
         title: "Quiz ready",
-        body: `Quiz for "${uniqueTitle}" has been generated and is ready to attempt.`,
+        body: bodyText,
         metadata: { status: "ready" },
       });
 
@@ -905,7 +915,7 @@ export const generateQuiz = onCall(
           quizId,
           type: "system",
           title: "Quiz generation failed",
-          body: `Quiz could not be generated: ${lastError}`,
+          body: `Quiz could not be generated: ${lastError}. Please retry or contact support.`,
           metadata: { lastError },
         });
       } catch (notifyErr) {

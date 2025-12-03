@@ -1709,6 +1709,22 @@ Focus on extracting the most important information that would help a student und
       console.log("[Firestore] Saving summary document...");
       await summariesRef.doc(summaryId).set(summaryData);
 
+      // Send notification that summary is ready
+      const materialNameDisplay =
+        materialData.length === 1
+          ? materialData[0].fileName
+          : `${materialData.length} materials`;
+
+      await dispatchNotification({
+        userId,
+        courseId,
+        materialId: primaryMaterialId,
+        type: "summaryReady",
+        title: "Summary ready",
+        body: `Summary for "${materialNameDisplay}" has been generated and is ready to view.`,
+        metadata: { status: "ready", summaryId, materialIds: sortedMaterialIds },
+      });
+
       console.log("========== GENERATE SUMMARY COMPLETE ==========");
       return {
         id: summaryId,

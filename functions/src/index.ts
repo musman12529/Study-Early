@@ -1,5 +1,6 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { onDocumentUpdated } from "firebase-functions/v2/firestore";
+import { onSchedule } from "firebase-functions/v2/scheduler";
 import { defineSecret } from "firebase-functions/params";
 import * as admin from "firebase-admin";
 import OpenAI from "openai";
@@ -1754,6 +1755,98 @@ Focus on extracting the most important information that would help a student und
         "internal",
         `Summary generation failed: ${error.message ?? "Unknown error"}`
       );
+    }
+  }
+);
+
+// Scheduled function to send event reminders (runs daily at 8 AM)
+export const sendEventReminders = onSchedule(
+  {
+    schedule: "0 8 * * *", // Every day at 8 AM
+    timeZone: "America/New_York",
+    region: REGION,
+  },
+  async (event) => {
+    console.log("========== SEND EVENT REMINDERS START ==========");
+    
+    const db = admin.firestore();
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+    
+    const tomorrowEnd = new Date(tomorrow);
+    tomorrowEnd.setHours(23, 59, 59, 999);
+
+    try {
+      // Get all users
+      const usersSnap = await db.collection("users").get();
+      
+      for (const userDoc of usersSnap.docs) {
+        const userId = userDoc.id;
+        
+        // Get all courses for this user
+        const coursesSnap = await userDoc.ref.collection("courses").get();
+        
+        for (const courseDoc of coursesSnap.docs) {
+          const courseId = courseDoc.id;
+          const courseData = courseDoc.data();
+          const courseName = courseData.name || courseData.title || "Course";
+          
+          // Get events for tomorrow
+          const eventsRef = courseDoc.ref.collection("events");
+          const eventsSnap = await eventsRef
+            .where("date", ">=", admin.firestore.Timestamp.fromDate(tomorrow))
+            .where("date", "<=", admin.firestore.Timestamp.fromDate(tomorrowEnd))
+            .get();
+          
+          for (const eventDoc of eventsSnap.docs) {
+            const eventData = eventDoc.data();
+            const eventTitle = eventData.title || "Event";
+            const eventType = eventData.type || "lecture";
+            const eventDate = (eventData.date as admin.firestore.Timestamp).toDate();
+            const eventTime = eventData.time 
+              ? (eventData.time as admin.firestore.Timestamp).toDate()
+              : null;
+            
+            // Format time for notification
+            let timeStr = "";
+            if (eventTime) {
+              const hours = eventTime.getHours();
+              const minutes = eventTime.getMinutes();
+              const period = hours >= 12 ? "PM" : "AM";
+              const displayHours = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
+              timeStr = ` at ${displayHours}:${minutes.toString().padStart(2, "0")} ${period}`;
+            }
+            
+            const typeLabel = eventType === "exam" 
+              ? "Exam" 
+              : eventType === "assignment" 
+              ? "Assignment due" 
+              : "Lecture";
+            
+            await dispatchNotification({
+              userId,
+              courseId,
+              type: "eventReminder",
+              title: `${typeLabel} Reminder`,
+              body: `${eventTitle}${timeStr} tomorrow for ${courseName}.`,
+              metadata: {
+                eventId: eventDoc.id,
+                eventType,
+                eventDate: eventDate.toISOString(),
+              },
+            });
+            
+            console.log(`[Reminder] Sent reminder for event ${eventDoc.id} to user ${userId}`);
+          }
+        }
+      }
+      
+      console.log("========== SEND EVENT REMINDERS COMPLETE ==========");
+    } catch (error: any) {
+      console.error("========== SEND EVENT REMINDERS ERROR ==========");
+      console.error("[Error Message]:", error.message);
+      console.error("[Full Error]:", error);
     }
   }
 );

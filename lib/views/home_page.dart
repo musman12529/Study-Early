@@ -103,6 +103,13 @@ class HomePage extends ConsumerWidget {
                               );
                             },
                           ),
+                          IconButton(
+                            icon: const Icon(Icons.calendar_today),
+                            tooltip: 'Calendar',
+                            onPressed: () {
+                              context.pushNamed('calendar');
+                            },
+                          ),
                           NotificationBellButton(
                             userId: user.uid,
                             onPressed: () {

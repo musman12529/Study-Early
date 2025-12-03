@@ -263,7 +263,19 @@ export const deleteMaterial = onCall(
         }
       }
 
-      // 4.4 Delete Firestore material (last)
+      // 4.4 Delete associated summaries
+      console.log("[Firestore] Deleting associated summaries...");
+      const summariesRef = courseRef.collection("summaries");
+      const summariesSnap = await summariesRef
+        .where("materialIds", "array-contains", materialId)
+        .get();
+      
+      for (const summaryDoc of summariesSnap.docs) {
+        await summaryDoc.ref.delete();
+        console.log(`[Firestore] Deleted summary ${summaryDoc.id}.`);
+      }
+
+      // 4.5 Delete Firestore material (last)
       console.log("[Firestore] Deleting material document...");
       await materialRef.delete();
       console.log("[Firestore] Material document deleted.");
@@ -443,7 +455,17 @@ export const deleteCourse = onCall(
         await courseRef.collection("materials").doc(materialId).delete();
       }
 
-      // 3️⃣b Delete quizzes and their attempts
+      // 3️⃣b Delete summaries
+      console.log("[Firestore] Loading summaries...");
+      const summariesSnap = await courseRef.collection("summaries").get();
+      console.log(`[Firestore] Found ${summariesSnap.size} summaries.`);
+
+      for (const summaryDoc of summariesSnap.docs) {
+        await summaryDoc.ref.delete();
+        console.log(`[Firestore] Deleted summary ${summaryDoc.id}.`);
+      }
+
+      // 3️⃣c Delete quizzes and their attempts
       console.log("[Firestore] Loading quizzes...");
       const quizzesSnap = await courseRef.collection("quizzes").get();
       console.log(`[Firestore] Found ${quizzesSnap.size} quizzes.`);
@@ -1478,6 +1500,260 @@ export const onQuizAttemptCompleted = onDocumentUpdated(
         body: `"${quizTitle}" has been graded. Tap to review your answers.`,
         metadata: { ...metadata, recipient: "student" },
       });
+    }
+  }
+);
+
+export const generateSummary = onCall(
+  {
+    region: "northamerica-northeast2",
+    secrets: [OPENAI_KEY],
+    timeoutSeconds: 300,
+  },
+  async (req) => {
+    const { userId, courseId, materialIds, vectorStoreId } = req.data ?? {};
+
+    // Validate required fields
+    if (!userId || !courseId) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Missing required fields: userId, courseId."
+      );
+    }
+
+    if (!Array.isArray(materialIds) || materialIds.length === 0) {
+      throw new HttpsError(
+        "invalid-argument",
+        "materialIds must be a non-empty array."
+      );
+    }
+
+    if (!vectorStoreId || typeof vectorStoreId !== "string") {
+      throw new HttpsError(
+        "invalid-argument",
+        "vectorStoreId must be a non-empty string."
+      );
+    }
+
+    const db = admin.firestore();
+    const openai = new OpenAI({ apiKey: OPENAI_KEY.value() });
+
+    const courseRef = db
+      .collection("users")
+      .doc(userId)
+      .collection("courses")
+      .doc(courseId);
+
+    console.log("========== GENERATE SUMMARY START ==========");
+    console.log("[Input]", req.data);
+
+    try {
+      // 1️⃣ Check if summary already exists for these materials
+      // Sort materialIds for consistent comparison
+      const sortedMaterialIds = [...materialIds].sort();
+      const summariesRef = courseRef.collection("summaries");
+      
+      // Fetch all summaries and check for exact match
+      const allSummariesSnap = await summariesRef.get();
+      let existingSummary: any = null;
+      
+      for (const doc of allSummariesSnap.docs) {
+        const summaryData = doc.data();
+        const summaryMaterialIds = (summaryData.materialIds || []).sort();
+        
+        // Compare arrays by length and content
+        if (
+          summaryMaterialIds.length === sortedMaterialIds.length &&
+          summaryMaterialIds.every((id: string, idx: number) => id === sortedMaterialIds[idx])
+        ) {
+          existingSummary = { id: doc.id, ...summaryData };
+          break;
+        }
+      }
+
+      if (existingSummary) {
+        console.log("[Cache] Found existing summary, returning cached version.");
+        return {
+          id: existingSummary.id,
+          summaryText: existingSummary.summaryText,
+          materialIds: existingSummary.materialIds,
+          cached: true,
+        };
+      }
+
+      // 2️⃣ Fetch materials to get their OpenAI file IDs
+      console.log("[Firestore] Fetching materials...");
+      const materialsRef = courseRef.collection("materials");
+      const materialsSnap = await materialsRef
+        .where(admin.firestore.FieldPath.documentId(), "in", materialIds)
+        .get();
+
+      if (materialsSnap.empty) {
+        throw new HttpsError(
+          "not-found",
+          "No materials found for the provided materialIds."
+        );
+      }
+
+      const fileIds: string[] = [];
+      const materialData: Array<{ id: string; fileName: string }> = [];
+
+      for (const doc of materialsSnap.docs) {
+        const material = doc.data() as {
+          openAiFileId?: string;
+          fileName?: string;
+          status?: string;
+        };
+
+        if (material.status !== "indexed") {
+          throw new HttpsError(
+            "failed-precondition",
+            `Material ${doc.id} is not indexed yet. Please wait for indexing to complete.`
+          );
+        }
+
+        if (material.openAiFileId) {
+          fileIds.push(material.openAiFileId);
+          materialData.push({
+            id: doc.id,
+            fileName: material.fileName ?? "Unknown",
+          });
+        }
+      }
+
+      if (fileIds.length === 0) {
+        throw new HttpsError(
+          "failed-precondition",
+          "No indexed materials with OpenAI file IDs found."
+        );
+      }
+
+      console.log(`[Materials] Found ${fileIds.length} indexed files.`);
+
+      // 3️⃣ Generate summary using OpenAI
+      const materialNames = materialData.map((m) => m.fileName).join(", ");
+      const prompt = `Please provide a comprehensive summary of the following course material(s): ${materialNames}
+
+The summary should:
+- Be clear and well-structured
+- Cover the main topics and key concepts
+- Highlight important definitions, formulas, or examples
+- Be concise but thorough (aim for 300-500 words)
+- Use plain text formatting (no markdown)
+- Organize information logically with clear sections
+
+Focus on extracting the most important information that would help a student understand the material quickly.`;
+
+      console.log("[OpenAI] Calling responses.create for summary generation...");
+      const response = await openai.responses.create({
+        model: "gpt-4o",
+        temperature: 0.3,
+        tools: [
+          {
+            type: "file_search",
+            vector_store_ids: [vectorStoreId],
+          },
+        ],
+        input: [
+          {
+            role: "system",
+            content: [
+              {
+                type: "input_text",
+                text: "You are a helpful assistant that creates clear, comprehensive summaries of educational materials. Use plain text formatting only (no markdown).",
+              },
+            ],
+          },
+          {
+            role: "user",
+            content: [
+              {
+                type: "input_text",
+                text: prompt,
+              },
+              // Attach selected files
+              ...fileIds.map((fileId: string) => ({
+                type: "input_file" as const,
+                file_id: fileId,
+              })),
+            ],
+          },
+        ],
+      });
+
+      const summaryText = response.output_text?.trim() || "";
+
+      if (!summaryText) {
+        throw new HttpsError(
+          "internal",
+          "OpenAI returned an empty summary. Please try again."
+        );
+      }
+
+      console.log("[OpenAI] Summary generated successfully.");
+
+      // 4️⃣ Save summary to Firestore
+      const summaryId = summariesRef.doc().id;
+      const primaryMaterialId = sortedMaterialIds[0]; // Use first material as primary
+
+      const summaryData = {
+        id: summaryId,
+        courseId,
+        materialId: primaryMaterialId,
+        summaryText,
+        materialIds: sortedMaterialIds,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+
+      console.log("[Firestore] Saving summary document...");
+      await summariesRef.doc(summaryId).set(summaryData);
+
+      // Send notification that summary is ready
+      const materialNameDisplay =
+        materialData.length === 1
+          ? materialData[0].fileName
+          : `${materialData.length} materials`;
+
+      await dispatchNotification({
+        userId,
+        courseId,
+        materialId: primaryMaterialId,
+        type: "summaryReady",
+        title: "Summary ready",
+        body: `Summary for "${materialNameDisplay}" has been generated and is ready to view.`,
+        metadata: { status: "ready", summaryId, materialIds: sortedMaterialIds },
+      });
+
+      console.log("========== GENERATE SUMMARY COMPLETE ==========");
+      return {
+        id: summaryId,
+        summaryText,
+        materialIds: sortedMaterialIds,
+        cached: false,
+      };
+    } catch (error: any) {
+      console.error("========== GENERATE SUMMARY ERROR ==========");
+      console.error("[Error Message]:", error.message);
+      console.error("[Full Error]:", error);
+
+      // If it's already an HttpsError, re-throw it
+      if (error instanceof HttpsError) {
+        throw error;
+      }
+
+      const requestId =
+        error?.response?.headers?.["x-request-id"] ??
+        error?.response?.headers?.get?.("x-request-id");
+
+      if (requestId) {
+        console.error("[OpenAI Request ID]:", requestId);
+      }
+
+      throw new HttpsError(
+        "internal",
+        `Summary generation failed: ${error.message ?? "Unknown error"}`
+      );
     }
   }
 );

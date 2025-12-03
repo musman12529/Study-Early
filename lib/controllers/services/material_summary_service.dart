@@ -54,9 +54,17 @@ class MaterialSummaryService {
         final summaryIds = [...summary.materialIds]..sort();
         
         // Compare arrays
-        if (summaryIds.length == sortedIds.length &&
-            summaryIds.every((id, idx) => id == sortedIds[idx])) {
-          return summary;
+        if (summaryIds.length == sortedIds.length) {
+          bool matches = true;
+          for (int i = 0; i < summaryIds.length; i++) {
+            if (summaryIds[i] != sortedIds[i]) {
+              matches = false;
+              break;
+            }
+          }
+          if (matches) {
+            return summary;
+          }
         }
       }
       return null;
@@ -78,10 +86,10 @@ class MaterialSummaryService {
       'vectorStoreId': vectorStoreId,
     });
 
-    final data = result.data as Map<String, dynamic>;
-    final summaryText = data['summaryText'] as String;
-    final summaryMaterialIds = List<String>.from(data['materialIds'] ?? []);
-    final summaryId = data['id'] as String;
+    final resultData = result.data as Map<String, dynamic>;
+    final summaryText = resultData['summaryText'] as String;
+    final summaryMaterialIds = List<String>.from(resultData['materialIds'] ?? []);
+    final summaryId = resultData['id'] as String;
 
     // Fetch the created summary from Firestore
     final summaryDoc = await _summariesRef(creatorId, courseId)
@@ -92,7 +100,17 @@ class MaterialSummaryService {
       throw StateError('Summary was created but not found in Firestore');
     }
 
-    return MaterialSummary.fromMap(summaryDoc);
+    // Convert DocumentSnapshot to QueryDocumentSnapshot-like structure
+    final docData = summaryDoc.data()!;
+    return MaterialSummary(
+      id: summaryId,
+      courseId: docData['courseId'] as String,
+      materialId: docData['materialId'] as String,
+      summaryText: docData['summaryText'] as String,
+      materialIds: List<String>.from(docData['materialIds'] ?? []),
+      createdAt: (docData['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      updatedAt: (docData['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+    );
   }
 }
 

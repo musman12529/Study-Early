@@ -374,7 +374,7 @@ class _CourseDetailPageState extends ConsumerState<CourseDetailPage> {
                   icon: const Icon(Icons.summarize_outlined),
                   color: _brandBlue,
                   onPressed: () {
-                    _showSummary(context, ref, user.uid, m);
+                    _showSummary(context, ref, userId, m);
                   },
                 ),
 

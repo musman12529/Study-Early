@@ -75,6 +75,11 @@ class AllCalendarEventsNotifier
   @override
   AsyncValue<List<CalendarEvent>> build() {
     _service = CalendarService(FirebaseFirestore.instance);
+    
+    ref.onDispose(() {
+      _subscription?.cancel();
+    });
+    
     return const AsyncValue.loading();
   }
 
@@ -90,12 +95,6 @@ class AllCalendarEventsNotifier
           (events) => state = AsyncValue.data(events),
           onError: (error, stack) => state = AsyncValue.error(error, stack),
         );
-  }
-
-  @override
-  void dispose() {
-    _subscription?.cancel();
-    super.dispose();
   }
 }
 

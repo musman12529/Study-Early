@@ -10,9 +10,16 @@ import '../../models/course_material.dart';
 import '../../controllers/providers/course_material_provider.dart';
 
 class AddEventDialog extends ConsumerStatefulWidget {
-  const AddEventDialog({super.key, required this.userId});
+  const AddEventDialog({
+    super.key,
+    required this.userId,
+    this.event,
+    this.courseId,
+  });
 
   final String userId;
+  final CalendarEvent? event; // If provided, we're editing
+  final String? courseId; // Required if creating new event
 
   @override
   ConsumerState<AddEventDialog> createState() => _AddEventDialogState();
@@ -27,11 +34,25 @@ class _AddEventDialogState extends ConsumerState<AddEventDialog> {
   EventType _selectedType = EventType.lecture;
   String? _selectedCourseId;
   String? _selectedMaterialId;
+  bool _isEditing = false;
 
   @override
   void initState() {
     super.initState();
-    _selectedDate = DateTime.now();
+    _isEditing = widget.event != null;
+    if (_isEditing && widget.event != null) {
+      _titleController.text = widget.event!.title;
+      _selectedDate = widget.event!.date;
+      _selectedTime = widget.event!.time != null
+          ? TimeOfDay.fromDateTime(widget.event!.time!)
+          : null;
+      _selectedType = widget.event!.type;
+      _selectedCourseId = widget.event!.courseId;
+      _selectedMaterialId = widget.event!.materialId;
+    } else {
+      _selectedDate = DateTime.now();
+      _selectedCourseId = widget.courseId;
+    }
   }
 
   @override
@@ -45,7 +66,7 @@ class _AddEventDialogState extends ConsumerState<AddEventDialog> {
     final courses = ref.watch(courseListProvider(widget.userId));
 
     return AlertDialog(
-      title: const Text('Add Event'),
+      title: Text(_isEditing ? 'Edit Event' : 'Add Event'),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -111,7 +132,7 @@ class _AddEventDialogState extends ConsumerState<AddEventDialog> {
             ),
             const SizedBox(height: 16),
 
-            // Course selection
+            // Course selection (disabled when editing)
             const Text('Course', style: TextStyle(fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
@@ -126,12 +147,14 @@ class _AddEventDialogState extends ConsumerState<AddEventDialog> {
                   child: Text(course.title),
                 );
               }).toList(),
-              onChanged: (value) {
-                setState(() {
-                  _selectedCourseId = value;
-                  _selectedMaterialId = null;
-                });
-              },
+              onChanged: _isEditing
+                  ? null
+                  : (value) {
+                      setState(() {
+                        _selectedCourseId = value;
+                        _selectedMaterialId = null;
+                      });
+                    },
             ),
             const SizedBox(height: 16),
 
@@ -209,13 +232,13 @@ class _AddEventDialogState extends ConsumerState<AddEventDialog> {
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
-        ElevatedButton(
+          ElevatedButton(
           onPressed: _canSave() ? _saveEvent : null,
           style: ElevatedButton.styleFrom(
             backgroundColor: _brandBlue,
             foregroundColor: Colors.white,
           ),
-          child: const Text('Save'),
+          child: Text(_isEditing ? 'Update' : 'Save'),
         ),
       ],
     );
@@ -286,31 +309,65 @@ class _AddEventDialogState extends ConsumerState<AddEventDialog> {
         );
       }
 
-      await ref
-          .read(
-            calendarEventListProvider((
-              widget.userId,
-              _selectedCourseId!,
-            )).notifier,
-          )
-          .createEvent(
-            title: _titleController.text,
-            date: date,
-            time: time,
-            type: _selectedType,
-            materialId: _selectedMaterialId,
-          );
-
-      if (mounted) {
-        Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Event added successfully')),
+      if (_isEditing && widget.event != null) {
+        // Update existing event
+        final updatedEvent = widget.event!.copyWith(
+          title: _titleController.text,
+          date: date,
+          time: time,
+          type: _selectedType,
+          materialId: _selectedMaterialId,
         );
+
+        await ref
+            .read(
+              calendarEventListProvider((
+                widget.userId,
+                _selectedCourseId!,
+              )).notifier,
+            )
+            .updateEvent(updatedEvent);
+
+        if (mounted) {
+          Navigator.of(context).pop();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Event updated successfully')),
+          );
+        }
+      } else {
+        // Create new event
+        await ref
+            .read(
+              calendarEventListProvider((
+                widget.userId,
+                _selectedCourseId!,
+              )).notifier,
+            )
+            .createEvent(
+              title: _titleController.text,
+              date: date,
+              time: time,
+              type: _selectedType,
+              materialId: _selectedMaterialId,
+            );
+
+        if (mounted) {
+          Navigator.of(context).pop();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Event added successfully')),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error adding event: $e')),
+          SnackBar(
+            content: Text(
+              _isEditing
+                  ? 'Error updating event: $e'
+                  : 'Error adding event: $e',
+            ),
+          ),
         );
       }
     }

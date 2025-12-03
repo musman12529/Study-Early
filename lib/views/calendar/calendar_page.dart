@@ -7,6 +7,7 @@ import '../../controllers/providers/auth_providers.dart';
 import '../../controllers/providers/calendar_provider.dart';
 import '../../controllers/providers/course_providers.dart';
 import '../../models/calendar_event.dart';
+import '../../models/course.dart';
 import '../widgets/notification_bell_button.dart';
 import 'add_event_dialog.dart';
 
@@ -37,10 +38,15 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
           return const Scaffold(body: Center(child: Text('Not logged in')));
         }
 
+        final courses = ref.watch(courseListProvider(user.uid));
+        
         // Watch all events for the user
         final allEventsNotifier = ref.watch(allCalendarEventsProvider.notifier);
         allEventsNotifier.watchForUser(user.uid);
         final allEventsState = ref.watch(allCalendarEventsProvider);
+        
+        // Create a map of courseId -> course for quick lookup
+        final courseMap = {for (var course in courses) course.id: course};
 
         return Scaffold(
           backgroundColor: Colors.white,
@@ -119,7 +125,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                 // Calendar grid
                 Expanded(
                   child: allEventsState.when(
-                    data: (events) => _buildCalendar(events, user.uid),
+                    data: (events) => _buildCalendar(context, ref, events, user.uid, courseMap),
                     loading: () => const Center(child: CircularProgressIndicator()),
                     error: (err, stack) => Center(child: Text('Error: $err')),
                   ),
@@ -137,7 +143,8 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
     );
   }
 
-  Widget _buildCalendar(List<CalendarEvent> events, String userId) {
+  Widget _buildCalendar(
+      BuildContext context, WidgetRef ref, List<CalendarEvent> events, String userId, Map<String, Course> courseMap) {
     final firstDayOfMonth = DateTime(_currentMonth.year, _currentMonth.month, 1);
     final lastDayOfMonth = DateTime(
       _currentMonth.year,
@@ -206,7 +213,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                       _selectedDate = date;
                     });
                     if (dayEvents.isNotEmpty) {
-                      _showDayEventsDialog(context, dayEvents, date);
+                      _showDayEventsDialog(context, dayEvents, date, courseMap);
                     }
                   },
                   child: Container(
@@ -282,7 +289,12 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                   ),
                   const SizedBox(height: 8),
                   ..._getEventsForDate(monthEvents, _selectedDate)
-                      .map((event) => _buildEventItem(event)),
+                      .map((event) {
+                    final authState = ref.read(authStateChangesProvider);
+                    final currentUser = authState.asData?.value;
+                    if (currentUser == null) return const SizedBox.shrink();
+                    return _buildEventItem(context, ref, currentUser.uid, event, courseMap);
+                  }),
                 ],
               ),
             ),
@@ -291,7 +303,11 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
     );
   }
 
-  Widget _buildEventItem(CalendarEvent event) {
+  Widget _buildEventItem(
+      BuildContext context, WidgetRef ref, String userId, CalendarEvent event, Map<String, Course> courseMap) {
+    final course = courseMap[event.courseId];
+    final courseName = course?.title ?? 'Unknown Course';
+    
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
@@ -317,6 +333,14 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                     color: _navy,
                   ),
                 ),
+                Text(
+                  courseName,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
                 if (event.time != null)
                   Text(
                     _formatTime(event.time!),
@@ -327,6 +351,16 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                   ),
               ],
             ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.edit, size: 18),
+            color: _brandBlue,
+            onPressed: () => _editEvent(context, ref, userId, event),
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete, size: 18),
+            color: Colors.red,
+            onPressed: () => _deleteEvent(context, ref, userId, event),
           ),
         ],
       ),
@@ -387,7 +421,11 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
   }
 
   void _showDayEventsDialog(
-      BuildContext context, List<CalendarEvent> events, DateTime date) {
+      BuildContext context, List<CalendarEvent> events, DateTime date, Map<String, Course> courseMap) {
+    final authState = ref.read(authStateChangesProvider);
+    final user = authState.asData?.value;
+    if (user == null) return;
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -399,7 +437,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
             itemCount: events.length,
             itemBuilder: (context, index) {
               final event = events[index];
-              return _buildEventItem(event);
+              return _buildEventItemForDialog(context, ref, user.uid, event, courseMap);
             },
           ),
         ),
@@ -413,12 +451,141 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
     );
   }
 
+  Widget _buildEventItemForDialog(
+      BuildContext context, WidgetRef ref, String userId, CalendarEvent event, Map<String, Course> courseMap) {
+    final course = courseMap[event.courseId];
+    final courseName = course?.title ?? 'Unknown Course';
+    
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Container(
+            width: 4,
+            height: 40,
+            decoration: BoxDecoration(
+              color: _getEventColor(event.type),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  event.title,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: _navy,
+                  ),
+                ),
+                Text(
+                  courseName,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+                if (event.time != null)
+                  Text(
+                    _formatTime(event.time!),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.edit, size: 18),
+            color: _brandBlue,
+            onPressed: () {
+              Navigator.of(context).pop();
+              _editEvent(context, ref, userId, event);
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete, size: 18),
+            color: Colors.red,
+            onPressed: () {
+              Navigator.of(context).pop();
+              _deleteEvent(context, ref, userId, event);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _showAddEventDialog(
       BuildContext context, WidgetRef ref, String userId) async {
     await showDialog(
       context: context,
       builder: (context) => AddEventDialog(userId: userId),
     );
+  }
+
+  Future<void> _editEvent(
+      BuildContext context, WidgetRef ref, String userId, CalendarEvent event) async {
+    await showDialog(
+      context: context,
+      builder: (context) => AddEventDialog(
+        userId: userId,
+        event: event,
+        courseId: event.courseId,
+      ),
+    );
+  }
+
+  Future<void> _deleteEvent(
+      BuildContext context, WidgetRef ref, String userId, CalendarEvent event) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Event?'),
+        content: Text('Are you sure you want to delete "${event.title}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        await ref
+            .read(
+              calendarEventListProvider((
+                userId,
+                event.courseId,
+              )).notifier,
+            )
+            .deleteEvent(event.id);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Event deleted successfully')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error deleting event: $e')),
+          );
+        }
+      }
+    }
   }
 }
 

@@ -12,6 +12,7 @@ import '../controllers/providers/course_providers.dart';
 import '../controllers/providers/quiz_providers.dart';
 import '../models/course_material.dart';
 import 'widgets/notification_bell_button.dart';
+import 'widgets/quiz_generation_options_dialog.dart';
 
 enum _DeleteMaterialChoice { materialOnly, materialAndQuizzes }
 
@@ -73,7 +74,7 @@ class _CourseDetailPageState extends ConsumerState<CourseDetailPage> {
                     children: [
                       IconButton(
                         icon: const Icon(Icons.arrow_back),
-                        onPressed: () => Navigator.of(context).pop(),
+                        onPressed: () => context.pop(),
                       ),
                       Row(
                         mainAxisSize: MainAxisSize.min,
@@ -196,16 +197,16 @@ class _CourseDetailPageState extends ConsumerState<CourseDetailPage> {
                                             _isGenerating
                                         ? null
                                         : () async {
-                                            final numQuestions =
+                                            final options =
                                                 await _promptNumQuestions(
                                                   context,
                                                 );
-                                            if (numQuestions == null) return;
+                                            if (options == null) return;
                                             await _generateQuiz(
                                               context,
                                               ref,
                                               user.uid,
-                                              numQuestions,
+                                              options,
                                             );
                                           },
                                     style: ElevatedButton.styleFrom(
@@ -415,19 +416,17 @@ class _CourseDetailPageState extends ConsumerState<CourseDetailPage> {
                               ),
                               actions: [
                                 TextButton(
-                                  onPressed: () => Navigator.pop(context, null),
+                                  onPressed: () => context.pop(null),
                                   child: const Text('Cancel'),
                                 ),
                                 TextButton(
-                                  onPressed: () => Navigator.pop(
-                                    context,
+                                  onPressed: () => context.pop(
                                     _DeleteMaterialChoice.materialOnly,
                                   ),
                                   child: const Text('Material only'),
                                 ),
                                 TextButton(
-                                  onPressed: () => Navigator.pop(
-                                    context,
+                                  onPressed: () => context.pop(
                                     _DeleteMaterialChoice.materialAndQuizzes,
                                   ),
                                   child: const Text(
@@ -565,70 +564,12 @@ class _CourseDetailPageState extends ConsumerState<CourseDetailPage> {
     }
   }
 
-  Future<int?> _promptNumQuestions(BuildContext context) async {
-    final controller = TextEditingController(text: '5');
-    int? parsed = 5;
-    String? errorText;
-    return showDialog<int>(
+  Future<Map<String, dynamic>?> _promptNumQuestions(
+    BuildContext context,
+  ) async {
+    return showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              title: const Text('Number of questions'),
-              content: SizedBox(
-                width: 300,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      controller: controller,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      decoration: InputDecoration(
-                        hintText: 'Enter a number from 1 to 20',
-                        errorText: errorText,
-                      ),
-                      onChanged: (value) {
-                        final n = int.tryParse(value);
-                        setState(() {
-                          if (n == null || n < 1 || n > 20) {
-                            errorText = 'Enter a number from 1 to 20';
-                            parsed = null;
-                          } else {
-                            errorText = null;
-                            parsed = n;
-                          }
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 8),
-                    const Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        'Max 20 questions',
-                        style: TextStyle(fontSize: 12, color: Colors.black54),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context, null),
-                  child: const Text('Cancel'),
-                ),
-                TextButton(
-                  onPressed: parsed == null
-                      ? null
-                      : () => Navigator.pop(context, parsed),
-                  child: const Text('Generate'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+      builder: (context) => const QuizGenerationOptionsDialog(),
     );
   }
 
@@ -636,7 +577,7 @@ class _CourseDetailPageState extends ConsumerState<CourseDetailPage> {
     BuildContext context,
     WidgetRef ref,
     String creatorId,
-    int numQuestions,
+    Map<String, dynamic> options,
   ) async {
     if (_selectedMaterialIds.isEmpty) return;
     try {
@@ -658,7 +599,12 @@ class _CourseDetailPageState extends ConsumerState<CourseDetailPage> {
           .read(quizListProvider((creatorId, widget.courseId)).notifier)
           .generate(
             materialIds: _selectedMaterialIds.toList(),
-            numQuestions: numQuestions.clamp(1, 20),
+            numQuestions: (options['numQuestions'] as int).clamp(1, 20),
+            instructions: options['instructions'] as String?,
+            difficulty: options['difficulty'] as String?,
+            includeExplanations: options['includeExplanations'] as bool?,
+            temperature: (options['temperature'] as num?)?.toDouble(),
+            allowMultipleCorrect: options['allowMultipleCorrect'] as bool?,
           );
 
       setState(() {

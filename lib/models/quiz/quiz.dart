@@ -2,23 +2,35 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
 import 'quiz_question.dart';
 
-enum QuizStatus { pending, generating, ready, error }
+enum QuizDifficulty { easy, medium, hard, mixed }
 
-extension QuizStatusHelper on QuizStatus {
-  static QuizStatus fromString(String? value) {
+extension QuizDifficultyHelper on QuizDifficulty {
+  static QuizDifficulty fromString(String? value) {
     switch (value) {
-      case 'generating':
-        return QuizStatus.generating;
-      case 'ready':
-        return QuizStatus.ready;
-      case 'error':
-        return QuizStatus.error;
+      case 'Easy':
+        return QuizDifficulty.easy;
+      case 'Medium':
+        return QuizDifficulty.medium;
+      case 'Hard':
+        return QuizDifficulty.hard;
+      case 'Mixed':
       default:
-        return QuizStatus.pending;
+        return QuizDifficulty.mixed;
     }
   }
 
-  String get asString => toString().split('.').last;
+  String get asString {
+    switch (this) {
+      case QuizDifficulty.easy:
+        return 'Easy';
+      case QuizDifficulty.medium:
+        return 'Medium';
+      case QuizDifficulty.hard:
+        return 'Hard';
+      case QuizDifficulty.mixed:
+        return 'Mixed';
+    }
+  }
 }
 
 class Quiz {
@@ -34,8 +46,13 @@ class Quiz {
   final List<String> materialIds;
 
   final int numQuestions;
-  final QuizStatus status;
   final List<QuizQuestion> questions;
+
+  // Generation options
+  final String? instructions;
+  final QuizDifficulty difficulty;
+  final bool includeExplanations;
+  final double temperature;
 
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -48,8 +65,11 @@ class Quiz {
     required this.vectorStoreId,
     required this.materialIds,
     required this.numQuestions,
-    this.status = QuizStatus.pending,
     this.questions = const [],
+    this.instructions,
+    this.difficulty = QuizDifficulty.mixed,
+    this.includeExplanations = true,
+    this.temperature = 0.5,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) : id = id ?? const Uuid().v4(),
@@ -66,8 +86,11 @@ class Quiz {
       'vectorStoreId': vectorStoreId,
       'materialIds': materialIds,
       'numQuestions': numQuestions,
-      'status': status.asString,
       'questions': questions.map((q) => q.toMap()).toList(),
+      'instructions': instructions,
+      'difficulty': difficulty.asString,
+      'includeExplanations': includeExplanations,
+      'temperature': temperature,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
     };
@@ -94,10 +117,13 @@ class Quiz {
         (e) => e.toString(),
       )).toList(),
       numQuestions: (map['numQuestions'] as num?)?.toInt() ?? 0,
-      status: QuizStatusHelper.fromString(map['status']),
       questions: rawQuestions
           .map((q) => QuizQuestion.fromMap((q as Map<String, dynamic>)))
           .toList(),
+      instructions: map['instructions'] as String?,
+      difficulty: QuizDifficultyHelper.fromString(map['difficulty'] as String?),
+      includeExplanations: (map['includeExplanations'] as bool?) ?? true,
+      temperature: (map['temperature'] as num?)?.toDouble() ?? 0.5,
       createdAt: createdAtTs.toDate(),
       updatedAt: updatedAtTs.toDate(),
     );
@@ -108,8 +134,11 @@ class Quiz {
     String? vectorStoreId,
     List<String>? materialIds,
     int? numQuestions,
-    QuizStatus? status,
     List<QuizQuestion>? questions,
+    String? instructions,
+    QuizDifficulty? difficulty,
+    bool? includeExplanations,
+    double? temperature,
   }) {
     return Quiz(
       id: id,
@@ -119,8 +148,11 @@ class Quiz {
       vectorStoreId: vectorStoreId ?? this.vectorStoreId,
       materialIds: materialIds ?? this.materialIds,
       numQuestions: numQuestions ?? this.numQuestions,
-      status: status ?? this.status,
       questions: questions ?? this.questions,
+      instructions: instructions ?? this.instructions,
+      difficulty: difficulty ?? this.difficulty,
+      includeExplanations: includeExplanations ?? this.includeExplanations,
+      temperature: temperature ?? this.temperature,
       createdAt: createdAt,
       updatedAt: DateTime.now(),
     );

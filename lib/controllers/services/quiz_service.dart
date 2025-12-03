@@ -55,17 +55,12 @@ class QuizService {
     required String courseId,
     required List<String> materialIds,
     required int numQuestions,
+    String? instructions,
+    String? difficulty,
+    bool? includeExplanations,
+    double? temperature,
+    bool? allowMultipleCorrect,
   }) async {
-    // Load course to get vectorStoreId
-    final courseSnap = await _courseRef(creatorId, courseId).get();
-    final courseData = courseSnap.data();
-    final vectorStoreId = courseData?['vectorStoreId'] as String?;
-    if (vectorStoreId == null || vectorStoreId.isEmpty) {
-      throw StateError(
-        'Course is not indexed yet. Missing vector store. Please index materials first.',
-      );
-    }
-
     // Resolve OpenAI file IDs for the selected materials
     final materialsRef = _courseRef(
       creatorId,
@@ -92,10 +87,16 @@ class QuizService {
         ).httpsCallable('generateQuiz').call({
           'userId': creatorId,
           'courseId': courseId,
-          'vectorStoreId': vectorStoreId,
           'materialIds': materialIds,
           'fileIds': fileIds,
           'numQuestions': numQuestions,
+          if (instructions != null) 'instructions': instructions,
+          if (difficulty != null) 'difficulty': difficulty,
+          if (includeExplanations != null)
+            'includeExplanations': includeExplanations,
+          if (temperature != null) 'temperature': temperature,
+          if (allowMultipleCorrect != null)
+            'allowMultipleCorrect': allowMultipleCorrect,
         });
 
     final data = result.data as Map<String, dynamic>;

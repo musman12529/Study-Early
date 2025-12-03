@@ -1,8 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
-import {
-  onDocumentUpdated,
-  onDocumentWritten,
-} from "firebase-functions/v2/firestore";
+import { onDocumentUpdated } from "firebase-functions/v2/firestore";
 import { defineSecret } from "firebase-functions/params";
 import * as admin from "firebase-admin";
 import OpenAI from "openai";
@@ -528,17 +525,21 @@ export const generateQuiz = onCall(
     const {
       userId,
       courseId,
-      vectorStoreId,
       materialIds,
       fileIds,
       numQuestions,
+      instructions,
+      difficulty,
+      includeExplanations,
+      temperature,
+      allowMultipleCorrect,
     } = req.data ?? {};
 
     // Basic validation
-    if (!userId || !courseId || !vectorStoreId) {
+    if (!userId || !courseId) {
       throw new HttpsError(
         "invalid-argument",
-        "Missing required fields: userId, courseId, vectorStoreId."
+        "Missing required fields: userId, courseId."
       );
     }
 
@@ -558,6 +559,19 @@ export const generateQuiz = onCall(
 
     const numQ: number =
       typeof numQuestions === "number" && numQuestions > 0 ? numQuestions : 5; // default
+    const temp: number =
+      typeof temperature === "number" && temperature >= 0 && temperature <= 1
+        ? temperature
+        : 0.5;
+    const difficultyStr: string =
+      typeof difficulty === "string" &&
+      ["Easy", "Medium", "Hard", "Mixed"].includes(difficulty)
+        ? difficulty
+        : "Mixed";
+    const includeExps: boolean =
+      typeof includeExplanations === "boolean" ? includeExplanations : true;
+    const allowMultiple: boolean =
+      typeof allowMultipleCorrect === "boolean" ? allowMultipleCorrect : false;
 
     const db = admin.firestore();
     const openai = new OpenAI({ apiKey: OPENAI_KEY.value() });
@@ -578,60 +592,88 @@ export const generateQuiz = onCall(
     console.log("[Quiz ID]", quizId);
 
     try {
-      // Prompt that matches your Dart models
+      // Prompt that matches your Dart models and honors user customization
+      const customFocus =
+        typeof instructions === "string" && instructions.trim().length > 0
+          ? `\nUser customization and focus areas (follow strictly):\n${instructions.trim()}\n`
+          : "";
+      const difficultyGuidance =
+        difficultyStr === "Easy"
+          ? "Prefer straightforward, recall-level questions with clear, simple wording and obvious distractors."
+          : difficultyStr === "Medium"
+          ? "Prefer a mix of recall and conceptual understanding with moderate distractors."
+          : difficultyStr === "Hard"
+          ? "Prefer deeper conceptual reasoning with trickier distractors and nuanced distinctions."
+          : "Provide a balanced mix across easy, medium and hard.";
+      const explanationField = includeExps
+        ? `,\n              "explanation": "string"               // short explanation of the correct answer`
+        : "";
+      const correctRule = allowMultiple
+        ? `- MIX question types: include both single-correct and multiple-correct questions.
+        - Target distribution: roughly 60–80% single-correct and 20–40% multiple-correct.
+        - For each question, set "multipleCorrectAllowed" accordingly:
+          - false for single-correct (EXACTLY one option has "isCorrect": true)
+          - true for multiple-correct (prefer 2–3 options with "isCorrect": true)`
+        : "- Have exactly one correct answer.";
+      const correctComment = allowMultiple
+        ? "one or more options may be true (prefer 2–3 when multipleCorrectAllowed=true)"
+        : "exactly ONE option must be true";
       const prompt = `
-You are a strict quiz generator for course material.
+        You are a strict quiz generator for course material.
 
-Create ${numQ} randomized multiple-choice questions (MCQs) grounded ONLY in the
-provided course material (PDFs and vector store search). Do NOT use any outside
-knowledge or facts that are not directly supported by the material.
+        Create ${numQ} randomized multiple-choice questions (MCQs) grounded ONLY in the
+        provided course material (PDFs). Do NOT use any outside
+        knowledge or facts that are not directly supported by the material.
 
-Each question must:
-- Focus on important concepts from the material.
-- Be clear and unambiguous.
-- Have exactly one correct answer.
-- Have 3–5 options in total.
-- Be answerable purely from the provided material.
+        Difficulty preference: ${difficultyStr}.
+        Guidance: ${difficultyGuidance}
+        ${customFocus}
 
-Return ONLY a JSON object with this exact shape (no markdown, no extra keys):
+        Each question must:
+        - Focus on important concepts from the material.
+        - Be clear and unambiguous.
+        ${correctRule}
+        - Have 3–5 options in total.
+        - Be answerable purely from the provided material.
 
-{
-  "title": "string",                      // concise, human-friendly quiz title (<= 30 chars)
-  "questions": [
-    {
-      "id": "string",                       // unique question id (e.g., "q1", "q2", etc.)
-      "prompt": "string",                   // the question text
-      "options": [
+        Return ONLY a JSON object with this exact shape (no markdown, no extra keys):
+
         {
-          "id": "string",                   // unique option id (e.g., "o1", "o2", etc.)
-          "text": "string",                 // option text
-          "isCorrect": true | false         // exactly ONE option must be true
+          "title": "string",                      // concise, human-friendly quiz title (<= 30 chars)
+          "questions": [
+            {
+              "id": "string",                       // unique question id (e.g., "q1", "q2", etc.)
+              "prompt": "string",                   // the question text
+              "options": [
+                {
+                  "id": "string",                   // unique option id (e.g., "o1", "o2", etc.)
+                  "text": "string",                 // option text
+                  "isCorrect": true | false         // ${correctComment}
+                }
+              ],
+              "multipleCorrectAllowed": ${
+                allowMultiple ? "true | false" : "false"
+              }
+              ${explanationField}
+            }
+          ]
         }
-      ],
-      "multipleCorrectAllowed": false,      // always false for now
-      "explanation": "string"               // short explanation of the correct answer
-    }
-  ]
-}
 
-Rules:
-- Use ONLY facts that appear in the provided material.
-- If a fact is not explicitly in the material, do NOT mention it.
-- Do NOT include any commentary or text outside of the JSON object.
-- Output must be valid JSON only. Do NOT use backticks or code fences.
-`;
+        IMPORTANT REQUIREMENT:
+        Every question must be fully self-contained and understandable without reading
+        the original PDF. If a question involves code, formulas, definitions, examples,
+        or diagrams, you MUST include the relevant snippet directly inside the question.
+
+        Rules:
+        - ALL questions must be fully self-contained.
+        - If the question refers to code, include the code snippet.
+      `;
 
       console.log("[OpenAI] Calling responses.create for quiz generation...");
 
       const response = await openai.responses.create({
         model: "gpt-4o",
-        temperature: 0.7,
-        tools: [
-          {
-            type: "file_search",
-            vector_store_ids: [vectorStoreId],
-          },
-        ],
+        temperature: temp,
         input: [
           {
             role: "system",
@@ -711,6 +753,15 @@ Rules:
         }
       }
 
+      // If explanations are disabled, strip them from questions to be safe
+      if (!includeExps && Array.isArray(quizJson.questions)) {
+        for (const q of quizJson.questions) {
+          if (q && typeof q === "object" && "explanation" in q) {
+            delete (q as any).explanation;
+          }
+        }
+      }
+
       // Derive base title and ensure uniqueness
       const baseTitleRaw: string =
         typeof quizJson.title === "string" && quizJson.title.trim().length > 0
@@ -748,7 +799,7 @@ Rules:
         );
       }
 
-      // Optional sanity check: ensure each question has options + exactly one correct
+      // Optional sanity check: ensure each question has options + valid correct count
       for (const q of quizJson.questions) {
         if (!q.options || !Array.isArray(q.options) || q.options.length === 0) {
           throw new HttpsError(
@@ -760,10 +811,46 @@ Rules:
         const correctCount = q.options.filter(
           (o: any) => o.isCorrect === true
         ).length;
-        if (correctCount !== 1) {
-          console.warn(
-            "[Warning] Question does not have exactly one correct option. Correcting format."
+        if (!allowMultiple) {
+          // Single-answer mode only
+          if (correctCount !== 1) {
+            console.warn(
+              "[Warning] Single-answer mode: question does not have exactly one correct option. Proceeding."
+            );
+          }
+          q.multipleCorrectAllowed = false;
+        } else {
+          // Mixed mode: accept either single- or multi-correct
+          const flagProvided = Object.prototype.hasOwnProperty.call(
+            q,
+            "multipleCorrectAllowed"
           );
+          if (!flagProvided) {
+            // Derive the flag from correct count if missing
+            q.multipleCorrectAllowed = correctCount !== 1;
+          }
+          const isMulti = Boolean(q.multipleCorrectAllowed);
+          if (isMulti) {
+            if (correctCount < 1) {
+              console.warn(
+                "[Warning] Mixed mode: multi-correct question has zero correct options."
+              );
+            } else if (correctCount === 1) {
+              console.warn(
+                "[Warning] Mixed mode: multi-correct question has only one correct option."
+              );
+            } else if (correctCount > 3) {
+              console.warn(
+                "[Warning] Mixed mode: multi-correct question has more than 3 correct options."
+              );
+            }
+          } else {
+            if (correctCount !== 1) {
+              console.warn(
+                "[Warning] Mixed mode: single-correct question does not have exactly one correct option."
+              );
+            }
+          }
         }
       }
 
@@ -773,12 +860,17 @@ Rules:
         id: quizId,
         courseId,
         creatorId: userId,
-        vectorStoreId,
         materialIds,
         title: uniqueTitle,
         numQuestions: quizJson.questions.length,
-        status: "ready",
         questions: quizJson.questions,
+        instructions:
+          typeof instructions === "string" && instructions.trim().length > 0
+            ? instructions.trim()
+            : null,
+        difficulty: difficultyStr,
+        includeExplanations: includeExps,
+        temperature: temp,
         createdAt: now,
         updatedAt: now,
       };
@@ -802,6 +894,26 @@ Rules:
       console.error("========== GENERATE QUIZ ERROR ==========");
       console.error("[Error Message]:", error.message);
       console.error("[Full Error]:", error);
+
+      // Proactively notify failure
+      try {
+        const lastError =
+          (error && (error.message as string)) ?? "Unknown error";
+        await dispatchNotification({
+          userId,
+          courseId,
+          quizId,
+          type: "system",
+          title: "Quiz generation failed",
+          body: `Quiz could not be generated: ${lastError}`,
+          metadata: { lastError },
+        });
+      } catch (notifyErr) {
+        console.error(
+          "[Notifications] Failed to dispatch failure notice",
+          notifyErr
+        );
+      }
 
       const requestId =
         error?.response?.headers?.["x-request-id"] ??
@@ -911,14 +1023,22 @@ export const chatWithCourse = onCall(
       );
     }
 
-    if (!courseId || typeof courseId !== "string" || courseId.trim().length === 0) {
+    if (
+      !courseId ||
+      typeof courseId !== "string" ||
+      courseId.trim().length === 0
+    ) {
       throw new HttpsError(
         "invalid-argument",
         "courseId must be a non-empty string."
       );
     }
 
-    if (!message || typeof message !== "string" || message.trim().length === 0) {
+    if (
+      !message ||
+      typeof message !== "string" ||
+      message.trim().length === 0
+    ) {
       throw new HttpsError(
         "invalid-argument",
         "Message must be a non-empty string."
@@ -1018,7 +1138,7 @@ Your responses should be clean, readable plain text that displays well in a chat
       if (Array.isArray(conversationHistory)) {
         const historyLimit = 10;
         const recentHistory = conversationHistory.slice(-historyLimit);
-        
+
         for (const msg of recentHistory) {
           if (
             msg &&
@@ -1030,8 +1150,9 @@ Your responses should be clean, readable plain text that displays well in a chat
             // OpenAI responses.create API requires:
             // - user messages: type "input_text"
             // - assistant messages: type "output_text"
-            const contentType = msg.role === "assistant" ? "output_text" : "input_text";
-            
+            const contentType =
+              msg.role === "assistant" ? "output_text" : "input_text";
+
             messages.push({
               role: msg.role,
               content: [
@@ -1043,7 +1164,7 @@ Your responses should be clean, readable plain text that displays well in a chat
             });
           }
         }
-        
+
         if (conversationHistory.length > historyLimit) {
           console.log(
             `[Warning] Conversation history truncated from ${conversationHistory.length} to ${historyLimit} messages.`
@@ -1268,62 +1389,6 @@ export const onMaterialStatusUpdated = onDocumentUpdated(
         type: "materialIndexFailed",
         title: "Material indexing failed",
         body: `"${fileName}" needs your attention: ${lastError}`,
-        metadata: { status: afterStatus, lastError },
-      });
-    }
-  }
-);
-
-export const onQuizStatusUpdated = onDocumentWritten(
-  {
-    region: REGION,
-    document: "users/{userId}/courses/{courseId}/quizzes/{quizId}",
-  },
-  async (event) => {
-    const before = event.data?.before?.data() as
-      | Record<string, any>
-      | undefined;
-    const after = event.data?.after?.data() as
-      | Record<string, any>
-      | undefined;
-
-    if (!after) return;
-
-    const beforeStatus = before?.status;
-    const afterStatus = after.status;
-
-    if (!afterStatus) return;
-    const hadDocumentBefore = event.data?.before?.exists ?? false;
-    if (hadDocumentBefore && beforeStatus === afterStatus) return;
-
-    const userId = event.params.userId as string;
-    const courseId = event.params.courseId as string;
-    const quizId = event.params.quizId as string;
-    const quizTitle = after.title ?? "Quiz";
-
-    if (afterStatus === "ready") {
-      if (!hadDocumentBefore) return; // creation already handled in generateQuiz
-      await dispatchNotification({
-        userId,
-        courseId,
-        quizId,
-        type: "quizReady",
-        title: "Quiz ready",
-        body: `Quiz for "${quizTitle}" has been generated and is ready to attempt.`,
-        metadata: { status: afterStatus },
-      });
-      return;
-    }
-
-    if (afterStatus === "error") {
-      const lastError = after.lastError ?? "Unknown error";
-      await dispatchNotification({
-        userId,
-        courseId,
-        quizId,
-        type: "system",
-        title: "Quiz generation failed",
-        body: `"${quizTitle}" could not be generated: ${lastError}`,
         metadata: { status: afterStatus, lastError },
       });
     }

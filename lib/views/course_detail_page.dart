@@ -10,10 +10,12 @@ import '../controllers/providers/course_material_provider.dart';
 import '../controllers/providers/course_providers.dart';
 import '../controllers/providers/quiz_providers.dart';
 import '../controllers/providers/user_providers.dart';
+import '../controllers/providers/material_summary_provider.dart';
 import '../models/user_profile.dart';
 import '../models/course_material.dart';
 import 'widgets/notification_bell_button.dart';
 import 'widgets/quiz_generation_options_dialog.dart';
+import 'material_summary_page.dart';
 
 enum _DeleteMaterialChoice { materialOnly, materialAndQuizzes }
 
@@ -365,6 +367,17 @@ class _CourseDetailPageState extends ConsumerState<CourseDetailPage> {
 
               const SizedBox(width: 8),
 
+              // Summary button (only for indexed materials)
+              if (m.status == MaterialStatus.indexed)
+                IconButton(
+                  tooltip: 'View summary',
+                  icon: const Icon(Icons.summarize_outlined),
+                  color: _brandBlue,
+                  onPressed: () {
+                    _showSummary(context, ref, user.uid, m);
+                  },
+                ),
+
               // Retry if error
               if (m.status == MaterialStatus.error)
                 IconButton(
@@ -624,5 +637,40 @@ class _CourseDetailPageState extends ConsumerState<CourseDetailPage> {
         });
       }
     }
+  }
+
+  void _showSummary(
+    BuildContext context,
+    WidgetRef ref,
+    String userId,
+    CourseMaterial material,
+  ) {
+    final courses = ref.read(courseListProvider(userId));
+    final course = courses.firstWhere(
+      (c) => c.id == widget.courseId,
+      orElse: () => courses.first,
+    );
+
+    if (course.vectorStoreId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Course vector store not available.'),
+        ),
+      );
+      return;
+    }
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => MaterialSummaryPage(
+          userId: userId,
+          courseId: widget.courseId,
+          materialId: material.id,
+          materialIds: [material.id],
+          materialName: material.fileName,
+          vectorStoreId: course.vectorStoreId!,
+        ),
+      ),
+    );
   }
 }

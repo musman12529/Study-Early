@@ -21,6 +21,8 @@ dependencies:
   firebase_app_check: ^0.4.0
   firebase_messaging: ^16.0.4
   flutter_local_notifications: ^17.2.2
+  pdf: ^3.11.0
+  printing: ^5.13.1
 
 dev_dependencies:
   flutter_test:
@@ -34,4 +36,3 @@ flutter:
     - asset/logo.png
     - asset/student.png
     - asset/prof.png
-

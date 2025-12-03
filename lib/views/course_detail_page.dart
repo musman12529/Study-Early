@@ -2,7 +2,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -10,6 +9,8 @@ import '../controllers/providers/auth_providers.dart';
 import '../controllers/providers/course_material_provider.dart';
 import '../controllers/providers/course_providers.dart';
 import '../controllers/providers/quiz_providers.dart';
+import '../controllers/providers/user_providers.dart';
+import '../models/user_profile.dart';
 import '../models/course_material.dart';
 import 'widgets/notification_bell_button.dart';
 import 'widgets/quiz_generation_options_dialog.dart';
@@ -595,6 +596,11 @@ class _CourseDetailPageState extends ConsumerState<CourseDetailPage> {
         );
       }
 
+      final profile = ref.read(userProfileStreamProvider).asData?.value;
+      final roleStr = (profile?.role == UserRole.professor)
+          ? 'professor'
+          : null;
+
       await ref
           .read(quizListProvider((creatorId, widget.courseId)).notifier)
           .generate(
@@ -605,6 +611,7 @@ class _CourseDetailPageState extends ConsumerState<CourseDetailPage> {
             includeExplanations: options['includeExplanations'] as bool?,
             temperature: (options['temperature'] as num?)?.toDouble(),
             allowMultipleCorrect: options['allowMultipleCorrect'] as bool?,
+            role: roleStr,
           );
 
       setState(() {

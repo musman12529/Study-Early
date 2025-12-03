@@ -1,9 +1,14 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:studyearly/controllers/services/user_service.dart';
+import 'package:studyearly/models/user_profile.dart';
 
 class SignUpScreen extends StatefulWidget {
-  const SignUpScreen({super.key});
+  const SignUpScreen({super.key, this.role = UserRole.student});
+
+  final UserRole role;
 
   @override
   State<SignUpScreen> createState() => _SignUpScreenState();
@@ -40,14 +45,28 @@ class _SignUpScreenState extends State<SignUpScreen> {
     setState(() => _isLoading = true);
 
     try {
-      await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      final cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
 
+      final user = cred.user;
+      if (user != null) {
+        final firestore = FirebaseFirestore.instance;
+        final users = UserService(firestore);
+        await users.createProfile(
+          userId: user.uid,
+          email: user.email ?? _emailController.text.trim(),
+          role: widget.role,
+          displayName: user.displayName,
+          photoUrl: user.photoURL,
+        );
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Sign up successful!')),
       );
+      if (mounted) context.go('/home');
     } on FirebaseAuthException catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.message ?? 'Sign up error')),

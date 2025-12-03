@@ -6,6 +6,11 @@ import '../../controllers/providers/auth_providers.dart';
 import '../../controllers/providers/course_providers.dart';
 import '../../controllers/providers/quiz_providers.dart';
 import '../../models/quiz/quiz.dart';
+import '../../controllers/providers/user_providers.dart';
+import '../../models/user_profile.dart';
+import 'dart:typed_data';
+import 'package:printing/printing.dart';
+import '../../utils/pdf_export.dart';
 
 class QuizListPage extends ConsumerWidget {
   const QuizListPage({super.key, required this.courseId});
@@ -39,6 +44,7 @@ class QuizListPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authStateChangesProvider);
+    final profileState = ref.watch(userProfileStreamProvider);
 
     return authState.when(
       loading: () =>
@@ -50,6 +56,8 @@ class QuizListPage extends ConsumerWidget {
         }
 
         final quizzes = ref.watch(quizListProvider((user.uid, courseId)));
+        final profile = profileState.asData?.value;
+        final isProfessor = profile?.role == UserRole.professor;
 
         final courses = ref.watch(courseListProvider(user.uid));
         String courseTitle;
@@ -138,13 +146,23 @@ class QuizListPage extends ConsumerWidget {
                                 borderRadius: BorderRadius.circular(18),
                                 onTap: q.questions.isNotEmpty
                                     ? () {
-                                        context.pushNamed(
-                                          'quizTake',
-                                          pathParameters: {
-                                            'courseId': courseId,
-                                            'quizId': q.id,
-                                          },
-                                        );
+                                        if (isProfessor) {
+                                          context.pushNamed(
+                                            'professorQuizView',
+                                            pathParameters: {
+                                              'courseId': courseId,
+                                              'quizId': q.id,
+                                            },
+                                          );
+                                        } else {
+                                          context.pushNamed(
+                                            'quizTake',
+                                            pathParameters: {
+                                              'courseId': courseId,
+                                              'quizId': q.id,
+                                            },
+                                          );
+                                        }
                                       }
                                     : null,
                                 child: Container(
@@ -192,9 +210,9 @@ class QuizListPage extends ConsumerWidget {
                                             ),
                                             const SizedBox(height: 4),
                                             Text(
-                                              '${_formatDateTime(q.createdAt)} • '
-                                              '${q.numQuestions} questions • '
-                                              '${q.materialIds.length} materials • '
+                                              '${_formatDateTime(q.createdAt)} - '
+                                              '${q.numQuestions} questions - '
+                                              '${q.materialIds.length} materials - '
                                               '${q.difficulty.asString}',
                                               style: const TextStyle(
                                                 fontSize: 12,
@@ -208,7 +226,16 @@ class QuizListPage extends ConsumerWidget {
                                       ),
                                       PopupMenuButton<String>(
                                         onSelected: (value) {
-                                          if (value == 'take' &&
+                                          if (value == 'view' &&
+                                              q.questions.isNotEmpty) {
+                                            context.pushNamed(
+                                              'professorQuizView',
+                                              pathParameters: {
+                                                'courseId': courseId,
+                                                'quizId': q.id,
+                                              },
+                                            );
+                                          } else if (value == 'take' &&
                                               q.questions.isNotEmpty) {
                                             context.pushNamed(
                                               'quizTake',
@@ -217,7 +244,8 @@ class QuizListPage extends ConsumerWidget {
                                                 'quizId': q.id,
                                               },
                                             );
-                                          } else if (value == 'attempts') {
+                                          } else if (value == 'attempts' &&
+                                              !isProfessor) {
                                             context.pushNamed(
                                               'quizAttempts',
                                               pathParameters: {
@@ -225,6 +253,11 @@ class QuizListPage extends ConsumerWidget {
                                                 'quizId': q.id,
                                               },
                                             );
+                                          } else if (value == 'download_quiz') {
+                                            // handled in itemBuilder using callback
+                                          } else if (value ==
+                                              'download_answers') {
+                                            // handled in itemBuilder using callback
                                           } else if (value == 'delete') {
                                             _confirmDelete(context).then((
                                               ok,
@@ -278,26 +311,73 @@ class QuizListPage extends ConsumerWidget {
                                             });
                                           }
                                         },
-                                        itemBuilder: (context) => [
-                                          PopupMenuItem(
-                                            value: 'take',
-                                            enabled: q.questions.isNotEmpty,
-                                            child: const Text('Take quiz'),
-                                          ),
-                                          const PopupMenuItem(
-                                            value: 'attempts',
-                                            child: Text('View attempts'),
-                                          ),
-                                          const PopupMenuItem(
-                                            value: 'delete',
-                                            child: Text(
-                                              'Delete quiz',
-                                              style: TextStyle(
-                                                color: Colors.red,
+                                        itemBuilder: (context) {
+                                          if (isProfessor) {
+                                            return [
+                                              PopupMenuItem(
+                                                value: 'view',
+                                                enabled: q.questions.isNotEmpty,
+                                                child: const Text('View quiz'),
                                               ),
-                                            ),
-                                          ),
-                                        ],
+                                              PopupMenuItem(
+                                                value: 'download_quiz',
+                                                enabled: q.questions.isNotEmpty,
+                                                child: const Text(
+                                                  'Download quiz PDF',
+                                                ),
+                                                onTap: () async {
+                                                  await _downloadQuizPdf(
+                                                    context,
+                                                    q,
+                                                  );
+                                                },
+                                              ),
+                                              PopupMenuItem(
+                                                value: 'download_answers',
+                                                enabled: q.questions.isNotEmpty,
+                                                child: const Text(
+                                                  'Download answers PDF',
+                                                ),
+                                                onTap: () async {
+                                                  await _downloadAnswersPdf(
+                                                    context,
+                                                    q,
+                                                  );
+                                                },
+                                              ),
+                                              const PopupMenuItem(
+                                                value: 'delete',
+                                                child: Text(
+                                                  'Delete quiz',
+                                                  style: TextStyle(
+                                                    color: Colors.red,
+                                                  ),
+                                                ),
+                                              ),
+                                            ];
+                                          } else {
+                                            return [
+                                              PopupMenuItem(
+                                                value: 'take',
+                                                enabled: q.questions.isNotEmpty,
+                                                child: const Text('Take quiz'),
+                                              ),
+                                              const PopupMenuItem(
+                                                value: 'attempts',
+                                                child: Text('View attempts'),
+                                              ),
+                                              const PopupMenuItem(
+                                                value: 'delete',
+                                                child: Text(
+                                                  'Delete quiz',
+                                                  style: TextStyle(
+                                                    color: Colors.red,
+                                                  ),
+                                                ),
+                                              ),
+                                            ];
+                                          }
+                                        },
                                       ),
                                     ],
                                   ),
@@ -314,6 +394,48 @@ class QuizListPage extends ConsumerWidget {
       },
     );
   }
+}
+
+Future<void> _downloadQuizPdf(BuildContext context, Quiz quiz) async {
+  try {
+    final Uint8List bytes = await buildQuizPdf(quiz);
+    final name = _sanitizeFileName('${quiz.title}_quiz.pdf');
+    await Printing.sharePdf(bytes: bytes, filename: name);
+    if (context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Quiz PDF ready.')));
+    }
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to prepare PDF: $e')));
+    }
+  }
+}
+
+Future<void> _downloadAnswersPdf(BuildContext context, Quiz quiz) async {
+  try {
+    final Uint8List bytes = await buildAnswersPdf(quiz);
+    final name = _sanitizeFileName('${quiz.title}_answers.pdf');
+    await Printing.sharePdf(bytes: bytes, filename: name);
+    if (context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Answer key PDF ready.')));
+    }
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to prepare PDF: $e')));
+    }
+  }
+}
+
+String _sanitizeFileName(String name) {
+  return name.replaceAll(RegExp(r'[\\/:*?"<>|]+'), '_').trim();
 }
 
 String _two(int v) => v.toString().padLeft(2, '0');

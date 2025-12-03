@@ -56,15 +56,7 @@ class RoleSelectionPage extends StatelessWidget {
                 label: 'Professor',
                 assetPath: 'asset/prof.png',
                 accentColor: accentRed,
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Optional feature, will be implemented later',
-                      ),
-                    ),
-                  );
-                },
+                onTap: () => context.go('/signup/professor'),
               ),
 
               const Spacer(),

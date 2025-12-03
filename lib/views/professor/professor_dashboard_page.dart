@@ -1,32 +1,55 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../controllers/providers/auth_providers.dart';
+import '../../controllers/providers/course_providers.dart';
+import '../../controllers/providers/user_providers.dart';
+import '../../models/user_profile.dart';
+import '../widgets/notification_bell_button.dart';
 import 'package:go_router/go_router.dart';
 
-import '../controllers/providers/auth_providers.dart';
-import '../controllers/providers/course_providers.dart';
-import '../controllers/providers/user_providers.dart';
-import 'widgets/notification_bell_button.dart';
-
-class HomePage extends ConsumerWidget {
-  const HomePage({super.key});
-
-  static const Color _brandBlue = Color(0xFF1A73E8);
+class ProfessorDashboardPage extends ConsumerStatefulWidget {
+  const ProfessorDashboardPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ProfessorDashboardPage> createState() =>
+      _ProfessorDashboardPageState();
+}
+
+class _ProfessorDashboardPageState
+    extends ConsumerState<ProfessorDashboardPage> {
+  static const Color _navy = Color(0xFF101828);
+
+  String? _selectedCourseId;
+
+  @override
+  Widget build(BuildContext context) {
     final authState = ref.watch(authStateChangesProvider);
+    final profileState = ref.watch(userProfileStreamProvider);
 
     return authState.when(
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (err, stack) => Scaffold(body: Center(child: Text("Error: $err"))),
+      error: (err, stack) => Scaffold(body: Center(child: Text('Error: $err'))),
       data: (user) {
         if (user == null) {
-          return const Scaffold(body: Center(child: Text("Not logged in")));
+          return const Scaffold(body: Center(child: Text('Not logged in')));
+        }
+        final profile = profileState.asData?.value;
+        if (profile == null) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        if (profile.role != UserRole.professor) {
+          return const Scaffold(
+            body: Center(child: Text('Professor access only')),
+          );
         }
 
         final courses = ref.watch(courseListProvider(user.uid));
+        _selectedCourseId ??= courses.isNotEmpty ? courses.first.id : null;
 
         return Scaffold(
           backgroundColor: Colors.white,
@@ -48,18 +71,15 @@ class HomePage extends ConsumerWidget {
                       ),
                       Row(
                         children: [
-                          Consumer(
-                            builder: (context, ref, _) {
-                              final profile = ref
-                                  .watch(userProfileStreamProvider)
-                                  .asData
-                                  ?.value;
-                              final photoUrl = profile?.photoUrl;
-                              final displayName = profile?.displayName ?? '';
+                          GestureDetector(
+                            onTap: () => context.pushNamed('profileEdit'),
+                            child: (() {
+                              final photoUrl = profile.photoUrl;
+                              final displayName = profile.displayName ?? '';
                               String initials = '';
                               if (displayName.isNotEmpty) {
                                 final parts = displayName.trim().split(
-                                  RegExp(r'\s+'),
+                                  RegExp(r'\\s+'),
                                 );
                                 if (parts.isNotEmpty) {
                                   initials = parts
@@ -71,42 +91,38 @@ class HomePage extends ConsumerWidget {
                                       )
                                       .join();
                                 }
-                              } else if (user.email != null &&
-                                  user.email!.isNotEmpty) {
-                                initials = user.email![0].toUpperCase();
                               }
-                              return GestureDetector(
-                                onTap: () => context.pushNamed('profileEdit'),
-                                child: Row(
-                                  children: [
-                                    CircleAvatar(
-                                      radius: 16,
-                                      backgroundImage:
-                                          (photoUrl != null &&
-                                              photoUrl.isNotEmpty)
-                                          ? NetworkImage(photoUrl)
-                                          : null,
-                                      child:
-                                          (photoUrl == null || photoUrl.isEmpty)
-                                          ? Text(
-                                              initials,
-                                              style: const TextStyle(
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w700,
-                                              ),
-                                            )
-                                          : null,
-                                    ),
-                                    const SizedBox(width: 12),
-                                  ],
-                                ),
+                              return Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 16,
+                                    backgroundImage:
+                                        (photoUrl != null &&
+                                            photoUrl.isNotEmpty)
+                                        ? NetworkImage(photoUrl)
+                                        : null,
+                                    child:
+                                        (photoUrl == null || photoUrl.isEmpty)
+                                        ? Text(
+                                            initials,
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          )
+                                        : null,
+                                  ),
+                                  const SizedBox(width: 12),
+                                ],
                               );
-                            },
+                            })(),
                           ),
                           NotificationBellButton(
                             userId: user.uid,
                             onPressed: () {
-                              context.pushNamed('notifications');
+                              if (context.mounted) {
+                                context.pushNamed('notifications');
+                              }
                             },
                           ),
                           IconButton(
@@ -119,26 +135,14 @@ class HomePage extends ConsumerWidget {
                       ),
                     ],
                   ),
-
                   const SizedBox(height: 24),
-
-                  // Friendly greeting with first name (prominent)
-                  Consumer(
-                    builder: (context, ref, _) {
-                      final profile = ref
-                          .watch(userProfileStreamProvider)
-                          .asData
-                          ?.value;
-                      final displayName = profile?.displayName ?? '';
-                      String firstName = '';
-                      if (displayName.isNotEmpty) {
-                        firstName = displayName
-                            .trim()
-                            .split(RegExp(r'\s+'))
-                            .first;
-                      } else if (user.email != null && user.email!.isNotEmpty) {
-                        firstName = user.email!.split('@').first;
-                      }
+                  // Friendly greeting (prominent)
+                  Builder(
+                    builder: (context) {
+                      final displayName = profile.displayName ?? '';
+                      final firstName = displayName.isNotEmpty
+                          ? displayName.trim().split(RegExp(r'\\s+')).first
+                          : '';
                       if (firstName.isEmpty) return const SizedBox.shrink();
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 6),
@@ -153,19 +157,16 @@ class HomePage extends ConsumerWidget {
                       );
                     },
                   ),
-
                   const SizedBox(height: 24),
                   const Text(
                     'Your Courses',
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF101828),
+                      color: _navy,
                     ),
                   ),
                   const SizedBox(height: 12),
-
-                  // Course list
                   Expanded(
                     child: courses.isEmpty
                         ? const Center(
@@ -175,6 +176,7 @@ class HomePage extends ConsumerWidget {
                                 fontSize: 14,
                                 color: Colors.black54,
                               ),
+                              textAlign: TextAlign.center,
                             ),
                           )
                         : ListView.separated(
@@ -186,6 +188,7 @@ class HomePage extends ConsumerWidget {
                               return InkWell(
                                 borderRadius: BorderRadius.circular(18),
                                 onTap: () {
+                                  // Navigate to course detail (materials + quizzes)
                                   context.pushNamed(
                                     'courseDetail',
                                     pathParameters: {'courseId': course.id},
@@ -266,19 +269,17 @@ class HomePage extends ConsumerWidget {
                                               );
                                             },
                                           );
-
                                           if (confirm != true) return;
 
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
+                                          final messenger =
+                                              ScaffoldMessenger.of(context);
+                                          messenger.showSnackBar(
                                             const SnackBar(
                                               content: _DeletingSnackBar(
                                                 label: "Deleting course…",
                                               ),
                                             ),
                                           );
-
                                           try {
                                             await ref
                                                 .read(
@@ -287,10 +288,7 @@ class HomePage extends ConsumerWidget {
                                                   ).notifier,
                                                 )
                                                 .remove(course.id);
-
-                                            ScaffoldMessenger.of(
-                                              context,
-                                            ).showSnackBar(
+                                            messenger.showSnackBar(
                                               const SnackBar(
                                                 content: Text(
                                                   "Course deleted successfully.",
@@ -298,9 +296,7 @@ class HomePage extends ConsumerWidget {
                                               ),
                                             );
                                           } catch (e) {
-                                            ScaffoldMessenger.of(
-                                              context,
-                                            ).showSnackBar(
+                                            messenger.showSnackBar(
                                               SnackBar(
                                                 content: Text(
                                                   "Failed to delete course: $e",
@@ -317,10 +313,7 @@ class HomePage extends ConsumerWidget {
                             },
                           ),
                   ),
-
                   const SizedBox(height: 16),
-
-                  // + New Course button
                   SizedBox(
                     width: double.infinity,
                     height: 56,
@@ -356,7 +349,6 @@ class HomePage extends ConsumerWidget {
                             );
                           },
                         );
-
                         final title = result?.trim();
                         if (title != null && title.isNotEmpty) {
                           await ref
@@ -365,7 +357,7 @@ class HomePage extends ConsumerWidget {
                         }
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: _brandBlue,
+                        backgroundColor: const Color(0xFF1A73E8),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
                         ),
@@ -389,6 +381,8 @@ class HomePage extends ConsumerWidget {
       },
     );
   }
+
+  // (Material upload removed; professors can manage materials inside course pages)
 }
 
 class _DeletingSnackBar extends StatelessWidget {

@@ -2,8 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../models/study_progress.dart';
 import '../../models/course_material.dart';
-import '../../models/quiz/quiz.dart';
-import '../../models/quiz/quiz_attempt.dart';
 
 class StudyProgressService {
   StudyProgressService({FirebaseFirestore? firestore})

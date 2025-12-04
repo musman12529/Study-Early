@@ -69,23 +69,11 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                           const SizedBox(width: 6),
                         ],
                       ),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.notifications_active_outlined),
-                            tooltip: 'Set up reminders',
-                            onPressed: () {
-                              context.pushNamed('remindersSetup');
-                            },
-                          ),
-                          NotificationBellButton(
-                            userId: user.uid,
-                            onPressed: () {
-                              context.pushNamed('notifications');
-                            },
-                          ),
-                        ],
+                      NotificationBellButton(
+                        userId: user.uid,
+                        onPressed: () {
+                          context.pushNamed('notifications');
+                        },
                       ),
                     ],
                   ),

@@ -1535,8 +1535,8 @@ export const sendReminders = onSchedule(
     const tzMinute = Number(minuteStr);
     const currentMinutes = tzHour * 60 + tzMinute;
 
-    // Fetch all reminder settings (for now assume small user base)
-    const snapshot = await db.collection("reminderSettings").get();
+    // Fetch all course reminder settings via collection group
+    const snapshot = await db.collectionGroup("reminderSettings").get();
     if (snapshot.empty) return;
 
     const dateFormatter = new Intl.DateTimeFormat("en-CA", {
@@ -1567,13 +1567,24 @@ export const sendReminders = onSchedule(
       // Skip if we've already sent today (for daily/weekly/biWeekly)
       if (lastSentKey === todayKey) continue;
 
-      const userId = doc.id;
+      // Path: users/{userId}/courses/{courseId}/reminderSettings/{docId}
+      const courseRef = doc.ref.parent.parent;
+      const userRef = courseRef?.parent.parent;
+      if (!courseRef || !userRef) continue;
+
+      const userId = userRef.id;
+      const courseId = courseRef.id;
+
+      const courseSnap = await courseRef.get();
+      const courseData = courseSnap.data() as { title?: string; name?: string } | undefined;
+      const courseTitle = courseData?.title ?? courseData?.name ?? "your course";
 
       await dispatchNotification({
         userId,
+        courseId,
         type: "system",
         title: "Study reminder",
-        body: "Time to review your courses and stay on track.",
+        body: `Time to review ${courseTitle} and stay on track.`,
         metadata: {
           frequency,
           hour,

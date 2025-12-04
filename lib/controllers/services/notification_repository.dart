@@ -66,6 +66,31 @@ class NotificationRepository {
       'readAt': FieldValue.serverTimestamp(),
     });
   }
+
+  /// Deletes all notifications that are already marked as read for the user.
+  Future<void> clearRead(String userId) async {
+    const pageSize = 50;
+    while (true) {
+      final snapshot = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('notifications')
+          .where('status', isEqualTo: NotificationStatus.read.name)
+          .limit(pageSize)
+          .get();
+
+      if (snapshot.docs.isEmpty) return;
+
+      final batch = _firestore.batch();
+      for (final doc in snapshot.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+
+      // If we got fewer than pageSize, we're done.
+      if (snapshot.docs.length < pageSize) return;
+    }
+  }
 }
 
 

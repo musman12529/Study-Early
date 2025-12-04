@@ -12,11 +12,12 @@
     <list default="true" id="5791d9c2-64e8-482c-bc4b-fa69c7081e67" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/functions/src/index.ts" beforeDir="false" afterPath="$PROJECT_DIR$/functions/src/index.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/controllers/providers/reminder_providers.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/controllers/providers/reminder_providers.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/main.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/main.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/views/reminders/reminders_setup_page.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/views/reminders/reminders_setup_page.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/views/widgets/notification_bootstrapper.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/views/widgets/notification_bootstrapper.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pubspec.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/pubspec.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/app_router.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/app_router.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/controllers/notifiers/notification_notifier.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/controllers/notifiers/notification_notifier.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/controllers/services/notification_repository.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/controllers/services/notification_repository.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/views/calendar/calendar_page.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/views/calendar/calendar_page.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/views/course_detail_page.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/views/course_detail_page.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/views/notifications/notifications_page.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/views/notifications/notifications_page.dart" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

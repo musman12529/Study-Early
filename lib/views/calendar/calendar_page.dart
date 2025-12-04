@@ -1,4 +1,3 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -70,11 +69,23 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                           const SizedBox(width: 6),
                         ],
                       ),
-                      NotificationBellButton(
-                        userId: user.uid,
-                        onPressed: () {
-                          context.pushNamed('notifications');
-                        },
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.notifications_active_outlined),
+                            tooltip: 'Set up reminders',
+                            onPressed: () {
+                              context.pushNamed('remindersSetup');
+                            },
+                          ),
+                          NotificationBellButton(
+                            userId: user.uid,
+                            onPressed: () {
+                              context.pushNamed('notifications');
+                            },
+                          ),
+                        ],
                       ),
                     ],
                   ),

@@ -21,6 +21,7 @@ import 'views/professor/professor_dashboard_page.dart';
 import 'views/profile/profile_edit_page.dart';
 import 'views/professor/professor_quiz_view_page.dart';
 import 'views/calendar/calendar_page.dart';
+import 'views/reminders/reminders_setup_page.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authStateChangesProvider);
@@ -223,6 +224,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'calendar',
         path: '/calendar',
         builder: (context, state) => const CalendarPage(),
+      ),
+      GoRoute(
+        name: 'remindersSetup',
+        path: '/reminders/setup',
+        builder: (context, state) => const RemindersSetupPage(),
       ),
     ],
 

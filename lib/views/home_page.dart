@@ -7,6 +7,7 @@ import '../controllers/providers/auth_providers.dart';
 import '../controllers/providers/course_providers.dart';
 import '../controllers/providers/user_providers.dart';
 import 'widgets/notification_bell_button.dart';
+import 'widgets/study_progress_overview.dart';
 
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
@@ -160,6 +161,11 @@ class HomePage extends ConsumerWidget {
                       );
                     },
                   ),
+
+                  const SizedBox(height: 24),
+
+                  // Study Progress Overview
+                  StudyProgressOverview(userId: user.uid),
 
                   const SizedBox(height: 24),
                   const Text(

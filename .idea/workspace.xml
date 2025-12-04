@@ -10,14 +10,8 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="5791d9c2-64e8-482c-bc4b-fa69c7081e67" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/functions/src/index.ts" beforeDir="false" afterPath="$PROJECT_DIR$/functions/src/index.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/app_router.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/app_router.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/controllers/notifiers/notification_notifier.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/controllers/notifiers/notification_notifier.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/controllers/services/notification_repository.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/controllers/services/notification_repository.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/views/calendar/calendar_page.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/views/calendar/calendar_page.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/views/course_detail_page.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/views/course_detail_page.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/views/notifications/notifications_page.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/views/notifications/notifications_page.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/controllers/services/study_progress_service.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/controllers/services/study_progress_service.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/views/widgets/study_progress_overview.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/views/widgets/study_progress_overview.dart" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -62,22 +56,22 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;Flutter.main.dart.executor&quot;: &quot;Run&quot;,
-    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.cidr.known.project.marker&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.readMode.enableVisualFormatting&quot;: &quot;true&quot;,
-    &quot;cf.first.check.clang-format&quot;: &quot;false&quot;,
-    &quot;cidr.known.project.marker&quot;: &quot;true&quot;,
-    &quot;dart.analysis.tool.window.visible&quot;: &quot;false&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;feature/reminders&quot;,
-    &quot;io.flutter.reload.alreadyRun&quot;: &quot;true&quot;,
-    &quot;show.migrate.to.gradle.popup&quot;: &quot;false&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "Flutter.main.dart.executor": "Run",
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.cidr.known.project.marker": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.readMode.enableVisualFormatting": "true",
+    "cf.first.check.clang-format": "false",
+    "cidr.known.project.marker": "true",
+    "dart.analysis.tool.window.visible": "false",
+    "git-widget-placeholder": "feature/study-progress-overview",
+    "io.flutter.reload.alreadyRun": "true",
+    "show.migrate.to.gradle.popup": "false"
   }
-}</component>
+}]]></component>
   <component name="TaskManager">
     <task active="true" id="Default" summary="Default task">
       <changelist id="5791d9c2-64e8-482c-bc4b-fa69c7081e67" name="Changes" comment="" />

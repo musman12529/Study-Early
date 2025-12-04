@@ -10,14 +10,14 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="5791d9c2-64e8-482c-bc4b-fa69c7081e67" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/libraries/Dart_Packages.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/libraries/Dart_Packages.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/libraries/Flutter_Plugins.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/libraries/Flutter_Plugins.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/android/app/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/android/app/build.gradle.kts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/functions/src/index.ts" beforeDir="false" afterPath="$PROJECT_DIR$/functions/src/index.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/controllers/services/notification_service.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/controllers/services/notification_service.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/views/home_page.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/views/home_page.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/views/widgets/notification_bootstrapper.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/views/widgets/notification_bootstrapper.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/app_router.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/app_router.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/controllers/notifiers/notification_notifier.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/controllers/notifiers/notification_notifier.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/controllers/services/notification_repository.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/controllers/services/notification_repository.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/views/calendar/calendar_page.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/views/calendar/calendar_page.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/views/course_detail_page.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/views/course_detail_page.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/views/notifications/notifications_page.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/views/notifications/notifications_page.dart" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -42,6 +42,9 @@
   </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="HighlightingSettingsPerFile">
+    <setting file="file://$PROJECT_DIR$/lib/main.dart" root0="FORCE_HIGHLIGHTING" />
   </component>
   <component name="ProjectColorInfo">{
   &quot;associatedIndex&quot;: 3
@@ -70,7 +73,7 @@
     &quot;cf.first.check.clang-format&quot;: &quot;false&quot;,
     &quot;cidr.known.project.marker&quot;: &quot;true&quot;,
     &quot;dart.analysis.tool.window.visible&quot;: &quot;false&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;feature/notifications&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;feature/reminders&quot;,
     &quot;io.flutter.reload.alreadyRun&quot;: &quot;true&quot;,
     &quot;show.migrate.to.gradle.popup&quot;: &quot;false&quot;
   }
@@ -96,7 +99,7 @@
       <breakpoints>
         <line-breakpoint enabled="true" type="Dart">
           <url>file://$PROJECT_DIR$/lib/views/role_selection_page.dart</url>
-          <line>28</line>
+          <line>31</line>
           <option name="timeStamp" value="1" />
         </line-breakpoint>
       </breakpoints>

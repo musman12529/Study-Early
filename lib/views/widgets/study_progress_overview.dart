@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../controllers/providers/study_progress_providers.dart';
-import '../../models/study_progress.dart';
 
 class StudyProgressOverview extends ConsumerWidget {
   const StudyProgressOverview({super.key, required this.userId});

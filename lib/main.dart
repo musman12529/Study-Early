@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app_router.dart';
 import 'controllers/services/notification_service.dart';
+import 'controllers/services/reminder_service.dart';
 import 'firebase_options.dart';
 import 'views/widgets/notification_bootstrapper.dart';
 
@@ -12,6 +13,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  await ReminderService.initialize();
   runApp(const ProviderScope(child: MainApp()));
 }
 

@@ -12,6 +12,10 @@ admin.initializeApp();
 const db = admin.firestore();
 const messaging = admin.messaging();
 const REGION = "northamerica-northeast2";
+const SCHEDULER_LOCATION = "us-central1";
+// Use the student's local timezone for reminders (Newfoundland)
+// This matches e.g. St. John's time, including the :30 offset.
+const REMINDER_TIME_ZONE = "America/St_Johns";
 
 const OPENAI_KEY = defineSecret("OPENAI_API_KEY");
 
@@ -1505,6 +1509,90 @@ export const onQuizAttemptCompleted = onDocumentUpdated(
   }
 );
 
+// 🕒 Scheduled reminders based on user reminderSettings
+export const sendReminders = onSchedule(
+  {
+    region: SCHEDULER_LOCATION,
+    // Run frequently so we can approximate the user's selected minute
+    schedule: "every 1 minutes",
+    timeZone: REMINDER_TIME_ZONE,
+  },
+  async () => {
+    const now = new Date();
+
+    // Interpret "now" in our chosen reminder timezone
+    const timeFormatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: REMINDER_TIME_ZONE,
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+    const [hourStr, minuteStr] = timeFormatter
+      .format(now)
+      .split(":")
+      .map((p) => p.trim());
+    const tzHour = Number(hourStr);
+    const tzMinute = Number(minuteStr);
+    const currentMinutes = tzHour * 60 + tzMinute;
+
+    // Fetch all reminder settings (for now assume small user base)
+    const snapshot = await db.collection("reminderSettings").get();
+    if (snapshot.empty) return;
+
+    const dateFormatter = new Intl.DateTimeFormat("en-CA", {
+      timeZone: REMINDER_TIME_ZONE,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    const todayKey = dateFormatter.format(now); // YYYY-MM-DD
+
+    for (const doc of snapshot.docs) {
+      const data = doc.data() as any;
+
+      const pushEnabled = data.pushNotificationsEnabled === true;
+      if (!pushEnabled) continue;
+
+      const hour = typeof data.hour === "number" ? data.hour : 10;
+      const minute = typeof data.minute === "number" ? data.minute : 0;
+      const frequency = (data.frequency as string) ?? "daily";
+      const lastSentKey = (data.lastSentDate as string | undefined) ?? null;
+
+      const reminderMinutes = hour * 60 + minute;
+
+      // Allow a small 2 minute window so we don't miss by a minute
+      const diff = currentMinutes - reminderMinutes;
+      if (diff < 0 || diff > 2) continue;
+
+      // Skip if we've already sent today (for daily/weekly/biWeekly)
+      if (lastSentKey === todayKey) continue;
+
+      const userId = doc.id;
+
+      await dispatchNotification({
+        userId,
+        type: "system",
+        title: "Study reminder",
+        body: "Time to review your courses and stay on track.",
+        metadata: {
+          frequency,
+          hour,
+          minute,
+        },
+      });
+
+      // Update lastSentDate so we don't send duplicates the same day
+      await doc.ref.set(
+        {
+          lastSentDate: todayKey,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+    }
+  }
+);
+
 export const generateSummary = onCall(
   {
     region: "northamerica-northeast2",
@@ -1764,7 +1852,7 @@ export const sendEventReminders = onSchedule(
   {
     schedule: "0 8 * * *", // Every day at 8 AM
     timeZone: "America/New_York",
-    region: REGION,
+    region: SCHEDULER_LOCATION,
   },
   async (event) => {
     console.log("========== SEND EVENT REMINDERS START ==========");

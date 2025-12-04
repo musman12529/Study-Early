@@ -17,6 +17,11 @@ class ReminderSettingsNotifier
   @override
   AsyncValue<ReminderSettings?> build(String userId) {
     _subscription?.cancel();
+    
+    // First, get the current value immediately
+    _loadCurrentValue(userId);
+    
+    // Then listen to changes
     _subscription = FirebaseFirestore.instance
         .collection('reminderSettings')
         .doc(userId)
@@ -41,6 +46,25 @@ class ReminderSettingsNotifier
     });
 
     return const AsyncValue.loading();
+  }
+
+  Future<void> _loadCurrentValue(String userId) async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('reminderSettings')
+          .doc(userId)
+          .get();
+      
+      if (doc.exists) {
+        final data = doc.data()!;
+        final settings = ReminderSettings.fromMap(userId, data);
+        state = AsyncValue.data(settings);
+      } else {
+        state = AsyncValue.data(null);
+      }
+    } catch (error, stack) {
+      state = AsyncValue.error(error, stack);
+    }
   }
 
   Future<void> saveSettings(ReminderSettings settings) async {

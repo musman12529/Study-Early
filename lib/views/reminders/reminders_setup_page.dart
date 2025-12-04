@@ -22,44 +22,12 @@ class _RemindersSetupPageState extends ConsumerState<RemindersSetupPage> {
   ReminderFrequency _frequency = ReminderFrequency.daily;
   TimeOfDay _selectedTime = const TimeOfDay(hour: 10, minute: 0);
   bool _isSaving = false;
+  bool _hasHydratedFromSettings = false;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadSettings();
-    });
-  }
-
-  void _loadSettings() {
-    final authState = ref.read(authStateChangesProvider);
-    final user = authState.asData?.value;
-    if (user == null) return;
-
-    ref.listen<AsyncValue<ReminderSettings?>>(
-      reminderSettingsProvider(user.uid),
-      (previous, next) {
-        final settings = next.value;
-        if (settings != null && mounted) {
-          setState(() {
-            _pushNotificationsEnabled = settings.pushNotificationsEnabled;
-            _frequency = settings.frequency;
-            _selectedTime = settings.time;
-          });
-        }
-      },
-    );
-
-    // Also check current value
-    final settingsAsync = ref.read(reminderSettingsProvider(user.uid));
-    final settings = settingsAsync.value;
-    if (settings != null && mounted) {
-      setState(() {
-        _pushNotificationsEnabled = settings.pushNotificationsEnabled;
-        _frequency = settings.frequency;
-        _selectedTime = settings.time;
-      });
-    }
+    // Settings will be loaded reactively via ref.watch in build method
   }
 
   Future<void> _saveSettings() async {
@@ -146,7 +114,65 @@ class _RemindersSetupPageState extends ConsumerState<RemindersSetupPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    final authState = ref.watch(authStateChangesProvider);
+    
+    return authState.when(
+      loading: () => const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      ),
+      error: (err, stack) => Scaffold(
+        body: Center(child: Text('Error: $err')),
+      ),
+      data: (user) {
+        if (user == null) {
+          return const Scaffold(
+            body: Center(child: Text('Not logged in')),
+          );
+        }
+
+        // Watch reminder settings and update local state when they change
+        final settingsAsync = ref.watch(reminderSettingsProvider(user.uid));
+        
+        // Listen for changes and update local state
+        ref.listen<AsyncValue<ReminderSettings?>>(
+          reminderSettingsProvider(user.uid),
+          (previous, next) {
+            final settings = next.value;
+            if (settings != null && mounted) {
+              // Only update if values actually changed to avoid unnecessary rebuilds
+              if (_pushNotificationsEnabled != settings.pushNotificationsEnabled ||
+                  _frequency != settings.frequency ||
+                  _selectedTime.hour != settings.time.hour ||
+                  _selectedTime.minute != settings.time.minute) {
+                setState(() {
+                  _pushNotificationsEnabled = settings.pushNotificationsEnabled;
+                  _frequency = settings.frequency;
+                  _selectedTime = settings.time;
+                });
+              }
+            }
+          },
+        );
+        
+        // Also check current value on first load only
+        final currentSettings = settingsAsync.value;
+        if (!_hasHydratedFromSettings &&
+            currentSettings != null &&
+            mounted) {
+          _hasHydratedFromSettings = true;
+          // Use a post-frame callback to avoid setState during build
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            setState(() {
+              _pushNotificationsEnabled =
+                  currentSettings.pushNotificationsEnabled;
+              _frequency = currentSettings.frequency;
+              _selectedTime = currentSettings.time;
+            });
+          });
+        }
+
+        return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
         child: Padding(
@@ -375,6 +401,8 @@ class _RemindersSetupPageState extends ConsumerState<RemindersSetupPage> {
           ),
         ),
       ),
+        );
+      },
     );
   }
 }

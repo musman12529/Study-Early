@@ -12,6 +12,7 @@ class NotificationBootstrapper extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Handle notification service start/stop only
     ref.listen<AsyncValue<User?>>(
       authStateChangesProvider,
       (previous, next) {
@@ -29,6 +30,7 @@ class NotificationBootstrapper extends ConsumerWidget {
         );
       },
     );
+    
     return child;
   }
 }

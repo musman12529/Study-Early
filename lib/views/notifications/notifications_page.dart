@@ -61,12 +61,25 @@ class NotificationsPage extends ConsumerWidget {
                           const SizedBox(width: 6),
                         ],
                       ),
-                      IconButton(
-                        tooltip: 'Mark all read',
-                        onPressed: state.unreadCount == 0
-                            ? null
-                            : notifier.markAllAsRead,
-                        icon: const Icon(Icons.done_all_outlined),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            tooltip: 'Mark all read',
+                            onPressed: state.unreadCount == 0
+                                ? null
+                                : notifier.markAllAsRead,
+                            icon: const Icon(Icons.done_all_outlined),
+                          ),
+                          IconButton(
+                            tooltip: 'Clear read',
+                            onPressed: state.notifications
+                                    .any((n) => !n.isUnread)
+                                ? notifier.clearRead
+                                : null,
+                            icon: const Icon(Icons.clear_all_outlined),
+                          ),
+                        ],
                       ),
                     ],
                   ),

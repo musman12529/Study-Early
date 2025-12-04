@@ -78,5 +78,15 @@ class NotificationListNotifier
       }).toList(),
     );
   }
+
+  /// Permanently removes all notifications that are already marked as read.
+  Future<void> clearRead() async {
+    final userId = arg;
+    await _repository.clearRead(userId);
+    state = state.copyWith(
+      notifications:
+          state.notifications.where((n) => n.isUnread).toList(),
+    );
+  }
 }
 

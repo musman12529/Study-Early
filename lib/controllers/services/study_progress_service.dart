@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../models/study_progress.dart';
@@ -18,19 +20,18 @@ class StudyProgressService {
         .collection('courses')
         .get();
 
-    int totalCourses = coursesSnapshot.docs.length;
-    int totalMaterials = 0;
-    int indexedMaterials = 0;
-    int totalQuizzes = 0;
-    int completedQuizzes = 0;
-    int totalQuizAttempts = 0;
-    int totalQuizScore = 0; // Sum of scores for average calculation
+      int totalCourses = coursesSnapshot.docs.length;
+      int totalMaterials = 0;
+      int totalQuizzes = 0;
+      int completedQuizzes = 0;
+      int totalQuizAttempts = 0;
+      int totalQuizScore = 0; // Sum of scores for average calculation
 
     // Iterate through each course
     for (final courseDoc in coursesSnapshot.docs) {
       final courseId = courseDoc.id;
 
-      // Count materials
+      // Count materials (uploaded or indexed)
       final materialsSnapshot = await _firestore
           .collection('users')
           .doc(userId)
@@ -40,10 +41,10 @@ class StudyProgressService {
           .get();
 
       for (final materialDoc in materialsSnapshot.docs) {
-        totalMaterials++;
         final status = materialDoc.data()['status'] as String?;
-        if (status == MaterialStatus.indexed.asString) {
-          indexedMaterials++;
+        // Count materials that are uploaded or indexed (not pending)
+        if (status != MaterialStatus.pendingUpload.asString) {
+          totalMaterials++;
         }
       }
 
@@ -92,7 +93,6 @@ class StudyProgressService {
     return StudyProgress(
       totalCourses: totalCourses,
       totalMaterials: totalMaterials,
-      indexedMaterials: indexedMaterials,
       totalQuizzes: totalQuizzes,
       completedQuizzes: completedQuizzes,
       totalQuizAttempts: totalQuizAttempts,
@@ -102,26 +102,33 @@ class StudyProgressService {
 
   /// Watch study progress (stream version for real-time updates)
   Stream<StudyProgress> watchProgress(String userId) {
-    // Watch all courses
-    return _firestore
+    // Watch courses stream
+    final coursesStream = _firestore
         .collection('users')
         .doc(userId)
         .collection('courses')
-        .snapshots()
-        .asyncMap((coursesSnapshot) async {
+        .snapshots();
+
+    // Helper function to calculate progress
+    Future<StudyProgress> _calculateProgress() async {
+      final coursesSnapshot = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('courses')
+          .get();
+
       int totalCourses = coursesSnapshot.docs.length;
       int totalMaterials = 0;
-      int indexedMaterials = 0;
       int totalQuizzes = 0;
       int completedQuizzes = 0;
       int totalQuizAttempts = 0;
       int totalQuizScore = 0;
+      final Set<String> quizzesWithCompletions = {};
 
-      // Iterate through each course
       for (final courseDoc in coursesSnapshot.docs) {
         final courseId = courseDoc.id;
 
-        // Count materials
+        // Count materials (uploaded or indexed)
         final materialsSnapshot = await _firestore
             .collection('users')
             .doc(userId)
@@ -131,14 +138,14 @@ class StudyProgressService {
             .get();
 
         for (final materialDoc in materialsSnapshot.docs) {
-          totalMaterials++;
           final status = materialDoc.data()['status'] as String?;
-          if (status == MaterialStatus.indexed.asString) {
-            indexedMaterials++;
+          // Count materials that are uploaded or indexed (not pending)
+          if (status != MaterialStatus.pendingUpload.asString) {
+            totalMaterials++;
           }
         }
 
-        // Count quizzes and completed quizzes
+        // Count quizzes
         final quizzesSnapshot = await _firestore
             .collection('users')
             .doc(userId)
@@ -147,19 +154,23 @@ class StudyProgressService {
             .collection('quizzes')
             .get();
 
-        for (final quizDoc in quizzesSnapshot.docs) {
-          totalQuizzes++;
+        totalQuizzes += quizzesSnapshot.docs.length;
 
-          // Check if this quiz has any completed attempts
+        // Check completed attempts for each quiz
+        for (final quizDoc in quizzesSnapshot.docs) {
+          final quizId = quizDoc.id;
           final attemptsSnapshot = await quizDoc.reference
               .collection('attempts')
               .where('completedAt', isNotEqualTo: null)
               .get();
 
           if (attemptsSnapshot.docs.isNotEmpty) {
-            completedQuizzes++;
+            if (!quizzesWithCompletions.contains(quizId)) {
+              quizzesWithCompletions.add(quizId);
+              completedQuizzes++;
+            }
 
-            // Calculate average score for this quiz
+            // Calculate average score
             for (final attemptDoc in attemptsSnapshot.docs) {
               final attemptData = attemptDoc.data();
               final numCorrect = (attemptData['numCorrect'] as num?)?.toInt() ?? 0;
@@ -182,12 +193,34 @@ class StudyProgressService {
       return StudyProgress(
         totalCourses: totalCourses,
         totalMaterials: totalMaterials,
-        indexedMaterials: indexedMaterials,
         totalQuizzes: totalQuizzes,
         completedQuizzes: completedQuizzes,
         totalQuizAttempts: totalQuizAttempts,
         averageQuizScore: averageQuizScore,
       );
+    }
+
+    // Watch courses, quiz attempts, and materials - recalculate when any changes
+    final attemptsStream = _firestore
+        .collectionGroup('attempts')
+        .where('completedAt', isNotEqualTo: null)
+        .snapshots();
+
+    final materialsStream = _firestore
+        .collectionGroup('materials')
+        .snapshots();
+
+    // Combine all streams using asyncExpand
+    // When courses change, set up a stream that also watches attempts and materials
+    return coursesStream.asyncMap((_) async {
+      // Calculate immediately when courses change
+      return await _calculateProgress();
+    }).asyncExpand((_) {
+      // After calculating from courses, also watch attempts
+      return attemptsStream.asyncMap((_) => _calculateProgress()).asyncExpand((_) {
+        // Also watch materials
+        return materialsStream.asyncMap((_) => _calculateProgress());
+      });
     });
   }
 }

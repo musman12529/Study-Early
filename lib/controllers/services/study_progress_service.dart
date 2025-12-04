@@ -108,6 +108,9 @@ class StudyProgressService {
         .doc(userId)
         .collection('courses')
         .snapshots();
+    
+    // Helper to create a combined stream
+    Stream<StudyProgress> _createCombinedStream() {
 
     // Helper function to calculate progress
     Future<StudyProgress> _calculateProgress() async {
@@ -200,28 +203,102 @@ class StudyProgressService {
       );
     }
 
-    // Watch courses, quiz attempts, and materials - recalculate when any changes
-    final attemptsStream = _firestore
-        .collectionGroup('attempts')
-        .where('completedAt', isNotEqualTo: null)
-        .snapshots();
+      // Watch courses, quizzes, quiz attempts, and materials - recalculate when any changes
+      final quizzesStream = _firestore
+          .collectionGroup('quizzes')
+          .snapshots();
 
-    final materialsStream = _firestore
-        .collectionGroup('materials')
-        .snapshots();
+      final attemptsStream = _firestore
+          .collectionGroup('attempts')
+          .where('completedAt', isNotEqualTo: null)
+          .snapshots();
 
-    // Combine all streams using asyncExpand
-    // When courses change, set up a stream that also watches attempts and materials
-    return coursesStream.asyncMap((_) async {
-      // Calculate immediately when courses change
-      return await _calculateProgress();
-    }).asyncExpand((_) {
-      // After calculating from courses, also watch attempts
-      return attemptsStream.asyncMap((_) => _calculateProgress()).asyncExpand((_) {
-        // Also watch materials
-        return materialsStream.asyncMap((_) => _calculateProgress());
+      final materialsStream = _firestore
+          .collectionGroup('materials')
+          .snapshots();
+
+      // Create a stream controller to combine all streams
+      final controller = StreamController<StudyProgress>.broadcast();
+      final subscriptions = <StreamSubscription>[];
+
+      // Listen to courses changes
+      subscriptions.add(
+        coursesStream.listen((_) async {
+          final progress = await _calculateProgress();
+          if (!controller.isClosed) {
+            controller.add(progress);
+          }
+        }, onError: (error) {
+          if (!controller.isClosed) {
+            controller.addError(error);
+          }
+        }),
+      );
+
+      // Listen to quizzes changes (when quiz is generated)
+      subscriptions.add(
+        quizzesStream.listen((_) async {
+          final progress = await _calculateProgress();
+          if (!controller.isClosed) {
+            controller.add(progress);
+          }
+        }, onError: (error) {
+          if (!controller.isClosed) {
+            controller.addError(error);
+          }
+        }),
+      );
+
+      // Listen to attempts changes
+      subscriptions.add(
+        attemptsStream.listen((_) async {
+          final progress = await _calculateProgress();
+          if (!controller.isClosed) {
+            controller.add(progress);
+          }
+        }, onError: (error) {
+          if (!controller.isClosed) {
+            controller.addError(error);
+          }
+        }),
+      );
+
+      // Listen to materials changes
+      subscriptions.add(
+        materialsStream.listen((_) async {
+          final progress = await _calculateProgress();
+          if (!controller.isClosed) {
+            controller.add(progress);
+          }
+        }, onError: (error) {
+          if (!controller.isClosed) {
+            controller.addError(error);
+          }
+        }),
+      );
+
+      // Calculate and emit initial progress
+      _calculateProgress().then((progress) {
+        if (!controller.isClosed) {
+          controller.add(progress);
+        }
+      }).catchError((error) {
+        if (!controller.isClosed) {
+          controller.addError(error);
+        }
       });
-    });
+
+      // Cancel subscriptions when stream is cancelled
+      controller.onCancel = () {
+        for (final sub in subscriptions) {
+          sub.cancel();
+        }
+      };
+
+      return controller.stream;
+    }
+
+    return _createCombinedStream();
   }
 }
 

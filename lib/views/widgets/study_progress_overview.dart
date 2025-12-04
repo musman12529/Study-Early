@@ -20,9 +20,6 @@ class StudyProgressOverview extends ConsumerWidget {
       loading: () => _buildLoadingState(),
       error: (_, __) => const SizedBox.shrink(),
       data: (progress) {
-        if (progress.totalCourses == 0) {
-          return const SizedBox.shrink();
-        }
 
         return Container(
           padding: const EdgeInsets.all(20),

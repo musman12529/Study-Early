@@ -10,8 +10,6 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="5791d9c2-64e8-482c-bc4b-fa69c7081e67" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/libraries/Flutter_Plugins.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/libraries/Flutter_Plugins.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/lib/controllers/services/study_progress_service.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/controllers/services/study_progress_service.dart" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/lib/views/widgets/study_progress_overview.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/views/widgets/study_progress_overview.dart" afterDir="false" />
     </list>

@@ -83,49 +83,33 @@ class _AddEventDialogState extends ConsumerState<AddEventDialog> {
 
             // Event type
             const Text('Type', style: TextStyle(fontWeight: FontWeight.w600)),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
-                  child: RadioListTile<EventType>(
-                    title: const Text('Lecture'),
-                    value: EventType.lecture,
-                    groupValue: _selectedType,
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedType = value!;
-                        if (_selectedType != EventType.assignment) {
-                          _selectedMaterialId = null;
-                        }
-                      });
-                    },
+                  child: _buildTypeCard(
+                    type: EventType.lecture,
+                    label: 'Lecture',
+                    icon: Icons.school,
+                    color: _brandBlue,
                   ),
                 ),
+                const SizedBox(width: 8),
                 Expanded(
-                  child: RadioListTile<EventType>(
-                    title: const Text('Exam'),
-                    value: EventType.exam,
-                    groupValue: _selectedType,
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedType = value!;
-                        if (_selectedType != EventType.assignment) {
-                          _selectedMaterialId = null;
-                        }
-                      });
-                    },
+                  child: _buildTypeCard(
+                    type: EventType.exam,
+                    label: 'Exam',
+                    icon: Icons.quiz,
+                    color: Colors.red,
                   ),
                 ),
+                const SizedBox(width: 8),
                 Expanded(
-                  child: RadioListTile<EventType>(
-                    title: const Text('Assignment'),
-                    value: EventType.assignment,
-                    groupValue: _selectedType,
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedType = value!;
-                      });
-                    },
+                  child: _buildTypeCard(
+                    type: EventType.assignment,
+                    label: 'Assignment',
+                    icon: Icons.assignment,
+                    color: Colors.orange,
                   ),
                 ),
               ],
@@ -371,6 +355,57 @@ class _AddEventDialogState extends ConsumerState<AddEventDialog> {
         );
       }
     }
+  }
+
+  Widget _buildTypeCard({
+    required EventType type,
+    required String label,
+    required IconData icon,
+    required Color color,
+  }) {
+    final isSelected = _selectedType == type;
+    
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedType = type;
+          if (_selectedType != EventType.assignment) {
+            _selectedMaterialId = null;
+          }
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? color.withOpacity(0.1) : Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? color : Colors.grey.shade300,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              color: isSelected ? color : Colors.grey.shade600,
+              size: 24,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                color: isSelected ? color : Colors.grey.shade700,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

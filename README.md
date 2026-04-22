@@ -2,6 +2,8 @@
 
 Study-Early is a Flutter + Firebase app that helps students organize coursework, generate quizzes, track study progress, and stay consistent with reminders.
 
+App:  https://musman12529.github.io/Study-Early/
+
 ## Features
 
 - Authentication with Firebase (sign up, sign in, onboarding, and role selection)

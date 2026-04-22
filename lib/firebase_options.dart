@@ -50,20 +50,21 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyByo4Q3R5CX2JWdCa3Cg5sR02ot1_2xMzQ',
-    appId: '1:521674901512:web:01e92cd486a61a4f2d29bd',
-    messagingSenderId: '521674901512',
-    projectId: 'gr09-studyearly-fall-2025',
-    authDomain: 'gr09-studyearly-fall-2025.firebaseapp.com',
-    storageBucket: 'gr09-studyearly-fall-2025.firebasestorage.app',
-    measurementId: 'G-7RS3L112XF',
+    apiKey: String.fromEnvironment('FIREBASE_WEB_API_KEY'),
+    appId: String.fromEnvironment('FIREBASE_WEB_APP_ID'),
+    messagingSenderId: String.fromEnvironment('FIREBASE_WEB_MESSAGING_SENDER_ID'),
+    projectId: String.fromEnvironment('FIREBASE_WEB_PROJECT_ID'),
+    authDomain: String.fromEnvironment('FIREBASE_WEB_AUTH_DOMAIN'),
+    storageBucket: String.fromEnvironment('FIREBASE_WEB_STORAGE_BUCKET'),
+    measurementId: String.fromEnvironment('FIREBASE_WEB_MEASUREMENT_ID'),
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyA1gxNWxzS6wekV7kszpuXU3GUdqMCVxzE',
-    appId: '1:521674901512:android:fb6e9147d54e7f3a2d29bd',
-    messagingSenderId: '521674901512',
-    projectId: 'gr09-studyearly-fall-2025',
-    storageBucket: 'gr09-studyearly-fall-2025.firebasestorage.app',
+    apiKey: String.fromEnvironment('FIREBASE_ANDROID_API_KEY'),
+    appId: String.fromEnvironment('FIREBASE_ANDROID_APP_ID'),
+    messagingSenderId:
+        String.fromEnvironment('FIREBASE_ANDROID_MESSAGING_SENDER_ID'),
+    projectId: String.fromEnvironment('FIREBASE_ANDROID_PROJECT_ID'),
+    storageBucket: String.fromEnvironment('FIREBASE_ANDROID_STORAGE_BUCKET'),
   );
 }

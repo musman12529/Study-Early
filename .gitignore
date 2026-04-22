@@ -110,6 +110,18 @@ coverage/
 # Symbols
 app.*.symbols
 
+# Secrets and local env files
+.env
+.env.*
+*.pem
+*.key
+*service-account*.json
+android/app/google-services.json
+lib/firebase_options.local.dart
+web/firebase-config.local.js
+!.env.example
+!.env.production.example
+
 # Exceptions to above rules.
 !**/ios/**/default.mode1v3
 !**/ios/**/default.mode2v3

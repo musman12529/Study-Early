@@ -57,6 +57,29 @@ Study-Early is a Flutter + Firebase app that helps students organize coursework,
 - `lib/controllers/` services and state logic
 - `lib/main.dart` app bootstrap and Firebase initialization
 
+## Deploy to GitHub Pages
+
+This repo includes a workflow at `.github/workflows/deploy_pages.yml` that deploys the web app when `main` is updated.
+
+1. In your GitHub repository, open **Settings -> Secrets and variables -> Actions**.
+2. Add repository secrets for each key in `.env.production.example`:
+   - `FIREBASE_WEB_API_KEY`
+   - `FIREBASE_WEB_APP_ID`
+   - `FIREBASE_WEB_MESSAGING_SENDER_ID`
+   - `FIREBASE_WEB_PROJECT_ID`
+   - `FIREBASE_WEB_AUTH_DOMAIN`
+   - `FIREBASE_WEB_STORAGE_BUCKET`
+   - `FIREBASE_WEB_MEASUREMENT_ID`
+   - `FIREBASE_ANDROID_API_KEY`
+   - `FIREBASE_ANDROID_APP_ID`
+   - `FIREBASE_ANDROID_MESSAGING_SENDER_ID`
+   - `FIREBASE_ANDROID_PROJECT_ID`
+   - `FIREBASE_ANDROID_STORAGE_BUCKET`
+3. In **Settings -> Pages**, set **Source** to **GitHub Actions**.
+4. Push to `main` (or run the workflow manually from the Actions tab).
+
+By default, the workflow builds with `--base-href /Study-Early/`. If your repository name changes, update that value in the workflow file.
+
 ## Contributing
 
 1. Create a feature branch.

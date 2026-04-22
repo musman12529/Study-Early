@@ -75,7 +75,7 @@ This repo includes a workflow at `.github/workflows/deploy_pages.yml` that deplo
    - `FIREBASE_ANDROID_MESSAGING_SENDER_ID`
    - `FIREBASE_ANDROID_PROJECT_ID`
    - `FIREBASE_ANDROID_STORAGE_BUCKET`
-3. In **Settings -> Pages**, set **Source** to **GitHub Actions**.
+3. In **Settings -> Pages**, set **Source** to **Deploy from a branch**, then choose branch `gh-pages` and folder `/ (root)`.
 4. Push to `main` (or run the workflow manually from the Actions tab).
 
 By default, the workflow builds with `--base-href /Study-Early/`. If your repository name changes, update that value in the workflow file.

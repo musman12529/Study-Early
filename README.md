@@ -1,2 +1,68 @@
-# gr09-studyearly-fall-2025
-StudyEarly - an app to help students stay on top of their school material throughout their semester.
+# Study-Early
+
+Study-Early is a Flutter + Firebase app that helps students organize coursework, generate quizzes, track study progress, and stay consistent with reminders.
+
+## Features
+
+- Authentication with Firebase (sign up, sign in, onboarding, and role selection)
+- Course and material management
+- Quiz generation and quiz attempts workflow
+- Calendar-based event planning
+- Reminder scheduling and notifications
+- Study progress overview widgets
+- Chat page and profile management
+
+## Tech Stack
+
+- Flutter (Dart)
+- Firebase:
+  - Authentication
+  - Cloud Firestore
+  - Cloud Functions
+  - Cloud Storage
+  - Cloud Messaging
+- Riverpod for state management
+- GoRouter for navigation
+
+## Prerequisites
+
+- Flutter SDK (matching project Dart SDK constraints)
+- A configured Firebase project
+- Platform setup for Flutter (Android Studio/Xcode as needed)
+
+## Getting Started
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/musman12529/Study-Early.git
+   cd Study-Early
+   ```
+2. Install dependencies:
+   ```bash
+   flutter pub get
+   ```
+3. Configure Firebase and local secrets:
+   - Copy `.env.example` to `.env` and fill in real values.
+   - For web push notifications, copy `web/firebase-config.local.js.example` to `web/firebase-config.local.js` and fill values.
+   - Place your Firebase Android config file at `android/app/google-services.json` (download from Firebase console).
+   - Keep these files local only; do not commit them.
+4. Run the app (recommended):
+   ```bash
+   flutter run --dart-define-from-file=.env
+   ```
+
+## Project Structure
+
+- `lib/views/` UI screens (calendar, reminders, chat, quiz, profile, auth)
+- `lib/controllers/` services and state logic
+- `lib/main.dart` app bootstrap and Firebase initialization
+
+## Contributing
+
+1. Create a feature branch.
+2. Make your changes and test locally.
+3. Open a pull request with a clear description.
+
+## License
+
+This repository is for educational/coursework purposes.
